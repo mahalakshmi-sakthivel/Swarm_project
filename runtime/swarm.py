@@ -31,6 +31,8 @@ from runtime.roles import (
     ROLE_COORDINATOR
 )
 from runtime.sandbox import Sandbox
+from runtime.vision.feedback import VisionFeedbackLoop
+from runtime.vision.similarity import VisualDiffResult
 
 logger = logging.getLogger("runtime.swarm")
 
@@ -43,17 +45,21 @@ class Swarm:
         blackboard: Blackboard,
         event_log: EventLog,
         sandbox: Sandbox,
-        llm_client: QwenClient
+        llm_client: QwenClient,
+        reference_image: Optional[str] = None,
+        vision_loop: Optional[VisionFeedbackLoop] = None,
     ):
         self.run_id = run_id
         self.goal_prompt = goal_prompt
+        self.reference_image = reference_image
+        self.vision_loop = vision_loop
         self.blackboard = blackboard
         self.event_log = event_log
         self.sandbox = sandbox
         self.llm_client = llm_client
 
         # Record goal on blackboard
-        self.blackboard.set_goal(self.run_id, self.goal_prompt)
+        self.blackboard.set_goal(self.run_id, self.goal_prompt, reference_image=self.reference_image)
 
         # Initialize the 5 specialized peer agents
         self.agents: List[SwarmAgent] = [
@@ -146,6 +152,7 @@ class Swarm:
 
         converged = False
         qa_report = None
+        vision_iter = 1
 
         try:
             while time.time() - start_time < max_seconds:
@@ -162,6 +169,38 @@ class Swarm:
                     pending_bugs = [s for s in active_signals if s.type == "bug_found"]
 
                     if qa_report.passed and not pending_bugs:
+                        # If a reference image is provided, evaluate visual convergence
+                        if self.reference_image and self.vision_loop:
+                            vision_result = self.vision_loop.run_iteration(
+                                run_id=self.run_id,
+                                blackboard=self.blackboard,
+                                event_log=self.event_log,
+                                sandbox=self.sandbox,
+                                reference_image_path=self.reference_image,
+                                iteration=vision_iter,
+                            )
+                            if vision_result.converged:
+                                logger.info(
+                                    f"Vision loop converged with score {vision_result.composite_score:.2f} "
+                                    f"(threshold {vision_result.threshold}). Swarm converged."
+                                )
+                                converged = True
+                                break
+                            else:
+                                vision_iter += 1
+                                if vision_iter > self.vision_loop.max_iterations:
+                                    logger.info(
+                                        f"Maximum vision iterations ({self.vision_loop.max_iterations}) reached. "
+                                        f"Concluding with score {vision_result.composite_score:.2f}."
+                                    )
+                                    converged = True
+                                    break
+                                logger.info(
+                                    f"Vision iteration {vision_iter - 1} generated targeted repair tasks. "
+                                    f"Continuing swarm loop."
+                                )
+                                continue
+
                         logger.info("All tasks completed and QA audit passed cleanly. Swarm converged.")
                         converged = True
                         break

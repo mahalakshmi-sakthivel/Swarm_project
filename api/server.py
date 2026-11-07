@@ -29,6 +29,7 @@ from runtime.llm import QwenClient
 from runtime.qa import run_qa_audit
 from runtime.sandbox import Sandbox, SandboxSecurityViolation
 from runtime.swarm import Swarm
+from runtime.vision.feedback import VisionFeedbackLoop
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = REPO_ROOT / "runs"
@@ -77,13 +78,14 @@ def get_run_components(run_id: str):
     return blackboard, event_log, sandbox
 
 
-async def execute_swarm_task(run_id: str, prompt: str, model: str):
+async def execute_swarm_task(run_id: str, prompt: str, model: str, reference_image: Optional[str] = None):
     """Background coroutine that executes the decentralized swarm until convergence."""
     logger.info(f"Background swarm execution started for run '{run_id}'")
     RUN_STATUSES[run_id] = "running"
     try:
         blackboard, event_log, sandbox = get_run_components(run_id)
         llm_client = QwenClient(model=model)
+        vision_loop = VisionFeedbackLoop(runs_dir=RUNS_DIR)
 
         swarm = Swarm(
             run_id=run_id,
@@ -91,7 +93,9 @@ async def execute_swarm_task(run_id: str, prompt: str, model: str):
             blackboard=blackboard,
             event_log=event_log,
             sandbox=sandbox,
-            llm_client=llm_client
+            llm_client=llm_client,
+            reference_image=reference_image,
+            vision_loop=vision_loop
         )
 
         res = await swarm.run(max_seconds=1200.0)
@@ -135,7 +139,7 @@ async def start_run(req: RunRequest):
     blackboard, _, _ = get_run_components(run_id)
     blackboard.set_goal(run_id, req.prompt, req.reference_image)
 
-    task = asyncio.create_task(execute_swarm_task(run_id, req.prompt, req.model or "qwen3.5:4b"))
+    task = asyncio.create_task(execute_swarm_task(run_id, req.prompt, req.model or "qwen3.5:4b", req.reference_image))
     ACTIVE_RUNS[run_id] = task
     RUN_STATUSES[run_id] = "running"
 
@@ -206,8 +210,18 @@ def get_run_details(run_id: str):
             "defects": [d.__dict__ for d in qa_report.defects],
             "checks_passed": qa_report.checks_passed
         },
+        "vision": [f.name for f in (run_dir / "vision").glob("*.png")] if (run_dir / "vision").exists() else [],
         "files": sandbox.list_files()
     }
+
+
+@app.get("/runs/{run_id}/vision/{filename}")
+def get_vision_asset(run_id: str, filename: str):
+    """Serve vision iteration screenshots and visual diff comparison maps."""
+    vision_file = RUNS_DIR / run_id / "vision" / filename
+    if not vision_file.exists():
+        raise HTTPException(status_code=404, detail="Vision asset not found")
+    return FileResponse(str(vision_file), media_type="image/png")
 
 
 @app.get("/runs/{run_id}/events")

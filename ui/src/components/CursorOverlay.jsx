@@ -98,3 +98,4 @@ export default function CursorOverlay({ activeEvents = [], enabled = true }) {
     </div>
   );
 }
+

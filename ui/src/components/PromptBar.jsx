@@ -112,3 +112,4 @@ export default function PromptBar({ onLaunchRun, isLaunching, onClose, isModal =
     </div>
   );
 }
+
