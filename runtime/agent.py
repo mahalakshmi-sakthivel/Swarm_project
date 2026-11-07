@@ -248,6 +248,17 @@ Return a JSON object with a list of tasks matching the InitialTasksPayload schem
                 active_signals = self.blackboard.get_active_signals(self.run_id)
                 for sig in active_signals:
                     if sig.type in self.sensitive_signals:
+                        # If target file already exists and this is not a bug repair signal, consume and skip
+                        if sig.target and self.sandbox.file_exists(sig.target) and "bug" not in sig.type:
+                            self.blackboard.consume_signal(self.run_id, sig.type, sig.target)
+                            continue
+
+                        # If an existing task for this target already exists or finished, consume and skip
+                        target_tasks = [t for t in all_tasks if t.target == sig.target]
+                        if target_tasks and "bug" not in sig.type:
+                            self.blackboard.consume_signal(self.run_id, sig.type, sig.target)
+                            continue
+
                         # Stigmergic reaction: synthesize task from signal
                         sig_task_id = f"task-{sig.type.replace('_', '-')}-{int(time.time() * 1000) % 10000}"
                         t = Task(

@@ -148,8 +148,8 @@ class QwenClient:
                     "format": "json",
                     "options": {
                         "temperature": temperature,
-                        "num_predict": 8192,
-                        "num_ctx": 16384
+                        "num_predict": 4096,
+                        "num_ctx": 8192
                     }
                 }
 
@@ -159,7 +159,7 @@ class QwenClient:
                 try:
                     res = await loop.run_in_executor(
                         None,
-                        lambda: requests.post(f"{self.host}/api/generate", json=payload, timeout=300)
+                        lambda: requests.post(f"{self.host}/api/generate", json=payload, timeout=600)
                     )
                     res.raise_for_status()
                     latency = round(time.time() - t0, 2)
