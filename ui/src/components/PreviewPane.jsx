@@ -7,9 +7,10 @@ export default function PreviewPane({
   tasks = [],
   activeEvents = [],
   reloadTrigger = 0,
+  runStatus = 'idle',
 }) {
   const [viewport, setViewport] = useState('desktop'); // desktop | tablet | mobile
-  const [showCursors, setShowCursors] = useState(true);
+  const [showCursors, setShowCursors] = useState(false);
   const [iframeKey, setIframeKey] = useState(Date.now());
   const iframeRef = useRef(null);
 
@@ -120,6 +121,7 @@ export default function PreviewPane({
             hasIndexHtml={hasIndexHtml}
             activeEvents={activeEvents}
             enabled={showCursors}
+            runStatus={runStatus}
           />
         </div>
       </div>

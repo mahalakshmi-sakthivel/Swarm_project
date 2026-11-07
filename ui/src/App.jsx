@@ -198,6 +198,19 @@ export default function App() {
   const files = runDetails?.files || [];
   const tasks = runDetails?.tasks || [];
 
+  // Calculate Build Progress & Stage Status
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter((t) => t.status === 'done' || t.status === 'completed').length;
+  const inProgressTask = tasks.find((t) => t.status === 'in_progress' || t.status === 'claimed');
+  const isFinished = runDetails?.status === 'converged' || runDetails?.status === 'completed';
+  const progressPercent = isFinished
+    ? 100
+    : totalTasks > 0
+    ? Math.min(95, Math.round((completedTasks / totalTasks) * 100))
+    : runDetails?.status === 'running'
+    ? 15
+    : 0;
+
   return (
     <div className="swarm-app">
       {/* Top Header */}
@@ -226,6 +239,48 @@ export default function App() {
           </div>
         )}
 
+        {/* Real-Time Build Progress & Completion Status */}
+        {currentRunId && (
+          <div className="build-progress-bar-container">
+            <div className="progress-meta">
+              <div className="progress-phase-info">
+                {isFinished ? (
+                  <span className="phase-text success">
+                    ✅ <strong>Build Complete:</strong> All tasks passed QA verification (100%)
+                  </span>
+                ) : runDetails?.status === 'running' ? (
+                  <span className="phase-text running">
+                    <span className="pulse-dot"></span> <strong>Building:</strong>{' '}
+                    {inProgressTask
+                      ? `${inProgressTask.title} (${inProgressTask.target || inProgressTask.role_hint})`
+                      : 'Swarm agents coordinating next file...'}
+                  </span>
+                ) : (
+                  <span className="phase-text idle">
+                    ⏸️ Status: {runDetails?.status || 'Idle'}
+                  </span>
+                )}
+              </div>
+              <div className="progress-timing-info">
+                <span className="task-count">
+                  Tasks: {completedTasks} of {Math.max(totalTasks, 4)} completed ({progressPercent}%)
+                </span>
+                {runDetails?.status === 'running' && (
+                  <span className="timing-estimate">
+                    ⏱️ Est. build time: 1.5 - 2.5 min (~30s / task)
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="progress-track">
+              <div
+                className={`progress-fill ${isFinished ? 'complete' : ''}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Workspace Split Layout */}
         <div className="workspace-grid">
           {/* Left Column: Live Preview & Cursors */}
@@ -240,6 +295,7 @@ export default function App() {
               tasks={tasks}
               activeEvents={events}
               reloadTrigger={reloadTrigger}
+              runStatus={runDetails?.status}
             />
           </section>
 

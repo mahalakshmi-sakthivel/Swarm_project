@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
-// Agent Role Color Palette matching Figma / Devin multiplayer aesthetics
+// Agent Role Color Palette
 const AGENT_ROLES = [
-  { id: 'structure', name: 'Layout', color: '#3b82f6', textColor: '#ffffff', tag: '1140 x 180' },
-  { id: 'style', name: 'Pixel', color: '#ec4899', textColor: '#ffffff', tag: 'Cards Grid' },
-  { id: 'script', name: 'Motion', color: '#10b981', textColor: '#ffffff', tag: '622 x 18' },
-  { id: 'qa', name: 'Critic', color: '#f59e0b', textColor: '#000000', tag: 'Lighthouse' },
-  { id: 'integration', name: 'Index', color: '#8b5cf6', textColor: '#ffffff', tag: 'Synthesizer' },
+  { id: 'structure', name: 'Layout (Structure)', color: '#3b82f6', textColor: '#ffffff' },
+  { id: 'style', name: 'Style Specialist', color: '#ec4899', textColor: '#ffffff' },
+  { id: 'script', name: 'Script Specialist', color: '#10b981', textColor: '#ffffff' },
+  { id: 'qa', name: 'QA Auditor', color: '#f59e0b', textColor: '#000000' },
+  { id: 'integration', name: 'Integration', color: '#8b5cf6', textColor: '#ffffff' },
 ];
 
 export default function CursorOverlay({
@@ -14,120 +14,78 @@ export default function CursorOverlay({
   activeEvents = [],
   tasks = [],
   hasIndexHtml = false,
-  enabled = true,
+  enabled = false,
+  runStatus = 'idle',
 }) {
-  if (!enabled) return null;
+  // Cursors ONLY show when a run is actively running and cursors are enabled.
+  // Once the build is completed, converged, or failed, all cursors disappear immediately.
+  if (!enabled || runStatus === 'completed' || runStatus === 'converged' || runStatus === 'failed') {
+    return null;
+  }
 
-  // Cursor Positions with smooth simulated animation between target sections
-  const [positions, setPositions] = useState({
-    structure: { x: 24, y: 18, active: true, box: { x: 12, y: 12, w: 76, h: 14 } },
-    style: { x: 56, y: 46, active: true, box: { x: 28, y: 38, w: 64, h: 26 } },
-    script: { x: 74, y: 72, active: true, box: { x: 42, y: 68, w: 48, h: 10 } },
-    qa: { x: 82, y: 28, active: true, box: { x: 70, y: 22, w: 22, h: 16 } },
-  });
+  // Active agents derived strictly from recent events (last 10 seconds)
+  const [activeAgents, setActiveAgents] = useState({});
 
-  // Natural animated gliding effect
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPositions((prev) => {
-        const next = { ...prev };
-        for (const role of Object.keys(next)) {
-          // Slight lifelike wandering around their active workspace
-          const dx = (Math.random() - 0.5) * 6;
-          const dy = (Math.random() - 0.5) * 4;
-          next[role] = {
-            ...next[role],
-            x: Math.max(8, Math.min(88, next[role].x + dx)),
-            y: Math.max(8, Math.min(84, next[role].y + dy)),
-          };
-        }
-        return next;
-      });
-    }, 1800);
-    return () => clearInterval(interval);
-  }, []);
+    if (!activeEvents || activeEvents.length === 0) {
+      setActiveAgents({});
+      return;
+    }
 
-  // Update target when new events arrive
-  useEffect(() => {
-    if (activeEvents.length === 0) return;
-    const latest = activeEvents[activeEvents.length - 1];
-    const agent = latest.agent || latest.agent_id || '';
-    const target = latest.target || '';
+    const recent = activeEvents.slice(-15);
+    const agentsMap = {};
 
-    let role = 'structure';
-    if (agent.includes('style') || target.includes('css')) role = 'style';
-    else if (agent.includes('script') || target.includes('js')) role = 'script';
-    else if (agent.includes('qa')) role = 'qa';
+    for (const ev of recent) {
+      const agentId = ev.agent || ev.agent_id || '';
+      const target = ev.target || '';
+      const eventType = ev.type || ev.event_type || '';
 
-    const targetCoords = {
-      'index.html': { x: 26, y: 20, box: { x: 10, y: 14, w: 80, h: 18 } },
-      'styles.css': { x: 58, y: 44, box: { x: 25, y: 35, w: 68, h: 30 } },
-      'script.js': { x: 68, y: 76, box: { x: 38, y: 66, w: 54, h: 14 } },
-      'vision': { x: 80, y: 30, box: { x: 65, y: 18, w: 28, h: 22 } },
-    };
+      if (!agentId) continue;
 
-    const coord = targetCoords[target] || { x: 48, y: 48, box: { x: 20, y: 20, w: 60, h: 40 } };
+      let role = 'structure';
+      if (agentId.includes('style') || target.includes('css')) role = 'style';
+      else if (agentId.includes('script') || target.includes('js')) role = 'script';
+      else if (agentId.includes('qa')) role = 'qa';
+      else if (agentId.includes('integration')) role = 'integration';
 
-    setPositions((prev) => ({
-      ...prev,
-      [role]: {
-        ...prev[role],
-        x: coord.x,
-        y: coord.y,
-        box: coord.box,
-        active: true,
-      },
-    }));
+      // Map targets to reasonable viewport regions
+      let pos = { x: 25, y: 25 };
+      if (role === 'structure') pos = { x: 30, y: 20 };
+      if (role === 'style') pos = { x: 50, y: 45 };
+      if (role === 'script') pos = { x: 65, y: 70 };
+      if (role === 'qa') pos = { x: 75, y: 30 };
+      if (role === 'integration') pos = { x: 45, y: 55 };
+
+      agentsMap[role] = {
+        role,
+        agentId,
+        target,
+        eventType,
+        ...pos,
+      };
+    }
+
+    setActiveAgents(agentsMap);
   }, [activeEvents]);
 
+  if (Object.keys(activeAgents).length === 0) return null;
+
   return (
-    <div className="multiplayer-cursor-layer">
-      {/* 1. Active Selection Bounding Boxes */}
-      {Object.entries(positions).map(([roleKey, pos]) => {
-        const roleDef = AGENT_ROLES.find((r) => r.id === roleKey) || AGENT_ROLES[0];
-        if (!pos.box) return null;
+    <div className="multiplayer-cursor-layer" style={{ pointerEvents: 'none' }}>
+      {Object.values(activeAgents).map((agentInfo) => {
+        const roleDef = AGENT_ROLES.find((r) => r.id === agentInfo.role) || AGENT_ROLES[0];
 
         return (
           <div
-            key={`box-${roleKey}`}
-            className="agent-selection-box"
-            style={{
-              left: `${pos.box.x}%`,
-              top: `${pos.box.y}%`,
-              width: `${pos.box.w}%`,
-              height: `${pos.box.h}%`,
-              borderColor: `${roleDef.color}88`,
-            }}
-          >
-            {/* Dimension / Component Tag Pill */}
-            <div
-              className="selection-dimension-pill"
-              style={{
-                backgroundColor: roleDef.color,
-                color: roleDef.textColor,
-              }}
-            >
-              {roleDef.tag}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* 2. Active Cursors with Solid Name Pills */}
-      {Object.entries(positions).map(([roleKey, pos]) => {
-        const roleDef = AGENT_ROLES.find((r) => r.id === roleKey) || AGENT_ROLES[0];
-
-        return (
-          <div
-            key={`cursor-${roleKey}`}
+            key={`cursor-${agentInfo.role}`}
             className="figma-cursor"
             style={{
-              left: `${pos.x}%`,
-              top: `${pos.y}%`,
+              left: `${agentInfo.x}%`,
+              top: `${agentInfo.y}%`,
               '--cursor-color': roleDef.color,
             }}
           >
-            {/* Crisp 20px SVG Cursor Arrow with outline */}
+            {/* Crisp 20px SVG Cursor Arrow */}
             <svg
               className="figma-pointer-icon"
               width="20"
@@ -149,7 +107,7 @@ export default function CursorOverlay({
                 color: roleDef.textColor,
               }}
             >
-              {roleDef.name}
+              {roleDef.name} {agentInfo.target ? `[${agentInfo.target}]` : ''}
             </div>
           </div>
         );

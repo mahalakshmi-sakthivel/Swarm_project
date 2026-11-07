@@ -1202,6 +1202,79 @@
 }
 
 /* ==========================================================================
+   Real-Time Build Progress & Completion Bar
+   ========================================================================== */
+.build-progress-bar-container {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.progress-phase-info .phase-text.running {
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-phase-info .phase-text.success {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.progress-phase-info .phase-text.idle {
+  color: var(--text-muted);
+}
+
+.progress-timing-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.task-count {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timing-estimate {
+  color: var(--text-muted);
+}
+
+.progress-track {
+  width: 100%;
+  height: 7px;
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease-in-out;
+}
+
+.progress-fill.complete {
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+/* ==========================================================================
    Responsive Adaptations
    ========================================================================== */
 @media (max-width: 1024px) {
