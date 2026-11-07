@@ -24,6 +24,7 @@ export default function App() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [reloadTrigger, setReloadTrigger] = useState(0);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   const wsSubRef = useRef(null);
 
@@ -282,7 +283,7 @@ export default function App() {
         )}
 
         {/* Workspace Split Layout */}
-        <div className="workspace-grid">
+        <div className={`workspace-grid ${isFocusMode ? 'focus-mode-grid' : ''}`}>
           {/* Left Column: Live Preview & Cursors */}
           <section className="preview-section">
             <div className="section-title-bar">
@@ -296,14 +297,18 @@ export default function App() {
               activeEvents={events}
               reloadTrigger={reloadTrigger}
               runStatus={runDetails?.status}
+              isFocusMode={isFocusMode}
+              onToggleFocusMode={setIsFocusMode}
             />
           </section>
 
-          {/* Right Column: Agents & Blackboard Tasks */}
-          <section className="sidebar-section">
-            <AgentCards agents={agents} activeTasks={tasks} />
-            <TaskBoard tasks={tasks} />
-          </section>
+          {/* Right Column: Agents & Blackboard Tasks (Hidden in Focus Mode) */}
+          {!isFocusMode && (
+            <section className="sidebar-section">
+              <AgentCards agents={agents} activeTasks={tasks} />
+              <TaskBoard tasks={tasks} />
+            </section>
+          )}
         </div>
 
         {/* Bottom Full-Width Log Stream */}

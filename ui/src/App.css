@@ -934,6 +934,82 @@
 }
 
 /* ==========================================================================
+   Focus Mode & Collapsed Layouts
+   ========================================================================== */
+.workspace-grid.focus-mode-grid {
+  grid-template-columns: 1fr !important;
+}
+
+.workspace-grid.focus-mode-grid .preview-frame-wrapper {
+  min-height: 75vh;
+}
+
+.workspace-grid.focus-mode-grid .preview-viewport-shell {
+  height: 75vh !important;
+}
+
+.workspace-grid.focus-mode-grid iframe {
+  height: 75vh !important;
+}
+
+.btn-focus-mode {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-accent);
+  color: var(--accent-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-focus-mode:hover,
+.btn-focus-mode.active {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.btn-external.highlight {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent-primary);
+  color: #60a5fa;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-external.highlight:hover {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+.event-feed-container.is-collapsed {
+  padding: 10px 16px;
+  gap: 0;
+  transition: all 0.2s ease;
+}
+
+.event-feed-container.is-collapsed:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.btn-feed-collapse {
+  font-size: 11px;
+  padding: 4px 10px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.btn-feed-collapse:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* ==========================================================================
    Live Event Terminal Feed
    ========================================================================== */
 .event-feed-container {

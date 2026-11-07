@@ -84,8 +84,6 @@ export default function AgentCards({ agents = {}, activeTasks = [] }) {
                 </div>
               </div>
 
-              <p className="agent-description">{roleDef.description}</p>
-
               <div className="agent-card-footer">
                 <div className="agent-target-row">
                   <span className="agent-footer-label">Target:</span>

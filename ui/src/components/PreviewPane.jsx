@@ -8,6 +8,8 @@ export default function PreviewPane({
   activeEvents = [],
   reloadTrigger = 0,
   runStatus = 'idle',
+  isFocusMode = false,
+  onToggleFocusMode = () => {},
 }) {
   const [viewport, setViewport] = useState('desktop'); // desktop | tablet | mobile
   const [showCursors, setShowCursors] = useState(false);
@@ -22,6 +24,7 @@ export default function PreviewPane({
   }, [reloadTrigger]);
 
   const previewUrl = runId ? `/runs/${runId}/preview/index.html?v=${iframeKey}` : null;
+  const directSiteUrl = runId ? `/runs/${runId}/preview/index.html` : null;
   const hasIndexHtml = files.includes('index.html');
 
   const getViewportWidth = () => {
@@ -36,7 +39,7 @@ export default function PreviewPane({
   };
 
   return (
-    <div className="preview-pane-container">
+    <div className={`preview-pane-container ${isFocusMode ? 'focus-mode-active' : ''}`}>
       {/* Viewport & Controls Bar */}
       <div className="preview-toolbar">
         <div className="viewport-controls">
@@ -64,6 +67,15 @@ export default function PreviewPane({
         </div>
 
         <div className="preview-actions">
+          {/* Focus Mode: Hide all sidebars and logs to focus solely on the website */}
+          <button
+            className={`btn-focus-mode ${isFocusMode ? 'active' : ''}`}
+            onClick={() => onToggleFocusMode(!isFocusMode)}
+            title={isFocusMode ? 'Show Swarm Panels' : 'Full Screen Website View'}
+          >
+            {isFocusMode ? '🗂️ Split View' : '🔍 Full Website View'}
+          </button>
+
           <button
             className={`btn-toggle-cursors ${showCursors ? 'active' : ''}`}
             onClick={() => setShowCursors(!showCursors)}
@@ -74,13 +86,13 @@ export default function PreviewPane({
 
           {previewUrl && hasIndexHtml && (
             <a
-              href={`/runs/${runId}/preview/index.html`}
+              href={directSiteUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-external"
-              title="Open preview in new tab"
+              className="btn-external highlight"
+              title="Open the pure generated website in a new tab without any dashboard UI"
             >
-              ↗ Open Tab
+              🌐 Open Full Page ↗
             </a>
           )}
         </div>
