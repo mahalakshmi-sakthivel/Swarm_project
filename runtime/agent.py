@@ -231,21 +231,17 @@ Return a JSON object with a list of tasks matching the InitialTasksPayload schem
         open_tasks = self.blackboard.list_tasks(self.run_id, status="open", role_hint=self.role_hint)
 
         if not open_tasks:
-            # If no tasks at all for this run, coordinator seeds (or structure fallback if running solo)
+            # If no tasks at all for this run, attempt atomic seed lock claim
             all_tasks = self.blackboard.list_tasks(self.run_id)
-            if not all_tasks and self.role_hint == "integration":
-                goal_data = self.blackboard.get_goal(self.run_id)
-                prompt = goal_data.get("prompt", "") if goal_data else "Build a modern responsive landing page"
-                await self.seed_initial_tasks(prompt)
-                open_tasks = self.blackboard.list_tasks(self.run_id, status="open", role_hint=self.role_hint)
-            elif not all_tasks and self.role_hint == "structure":
-                await asyncio.sleep(0.5)
-                all_tasks = self.blackboard.list_tasks(self.run_id)
-                if not all_tasks:
+            if not all_tasks and self.role_hint in ("integration", "structure"):
+                if self.blackboard.claim_seed_lock(self.run_id, self.agent_id):
                     goal_data = self.blackboard.get_goal(self.run_id)
                     prompt = goal_data.get("prompt", "") if goal_data else "Build a modern responsive landing page"
                     await self.seed_initial_tasks(prompt)
                     open_tasks = self.blackboard.list_tasks(self.run_id, status="open", role_hint=self.role_hint)
+                else:
+                    # Another agent is currently seeding; wait for tasks to appear
+                    return False
 
             if not open_tasks:
                 # Check for active signals that might wake this agent to create a task

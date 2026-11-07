@@ -103,3 +103,4 @@ tests/test_stage2_roles.py::test_role_attributes_and_system_prompts PASSED [ 91%
 tests/test_stage2_roles.py::test_role_resolution_by_hint_and_aliases PASSED [ 95%]
 tests/test_stage2_roles.py::test_sensitive_signals PASSED                [100%]
 ```
+

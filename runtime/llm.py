@@ -78,6 +78,35 @@ def get_schema_template(schema: Type[BaseModel]) -> str:
     return json.dumps(schema.model_json_schema(), indent=2)
 
 
+def try_repair_truncated_json(raw_text: str) -> Optional[dict]:
+    """Attempt heuristic repair for JSON stream cut off near end of tokens."""
+    text = raw_text.strip()
+    if not text.startswith("{"):
+        return None
+
+    # Try candidate endings to close unclosed strings and braces
+    candidates = [
+        "",
+        '"',
+        '"}',
+        '"}}',
+        '"]}',
+        '"]}}',
+        '"\n}',
+        '"\n}}',
+        '}\n}',
+        '}}}'
+    ]
+
+    for suffix in candidates:
+        candidate = text + suffix
+        try:
+            return json.loads(candidate)
+        except Exception:
+            continue
+    return None
+
+
 class QwenClient:
     """Async wrapper for Ollama Qwen 3.5 calls with schema enforcement and bounded retries."""
 
@@ -118,7 +147,9 @@ class QwenClient:
                     "stream": False,
                     "format": "json",
                     "options": {
-                        "temperature": temperature
+                        "temperature": temperature,
+                        "num_predict": 8192,
+                        "num_ctx": 16384
                     }
                 }
 
@@ -134,7 +165,16 @@ class QwenClient:
                     latency = round(time.time() - t0, 2)
                     raw_text = res.json().get("response", "").strip()
 
-                    parsed_json = json.loads(raw_text)
+                    try:
+                        parsed_json = json.loads(raw_text)
+                    except json.JSONDecodeError as decode_err:
+                        repaired = try_repair_truncated_json(raw_text)
+                        if repaired is not None:
+                            logger.info(f"Successfully auto-repaired truncated JSON on attempt {attempt+1}")
+                            parsed_json = repaired
+                        else:
+                            raise decode_err
+
                     validated_obj = schema(**parsed_json)
                     logger.info(f"LLM call succeeded on attempt {attempt+1} in {latency}s")
                     return validated_obj
@@ -149,5 +189,5 @@ class QwenClient:
                         f"{user_prompt}\n\n"
                         f"[RETRY NOTE - PREVIOUS OUTPUT REJECTED]: {str(e)}\n"
                         f"Fill in actual values into this structure without schema definitions:\n{template_str}\n"
-                        f"Ensure all quotes and strings are properly closed. Output only valid JSON."
+                        f"Keep the file clean and concise so it does not get truncated. Ensure all quotes and strings are properly closed. Output only valid JSON."
                     )

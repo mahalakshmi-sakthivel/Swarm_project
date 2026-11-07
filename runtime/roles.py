@@ -60,7 +60,7 @@ RULES:
 2. Design a cohesive, modern dark-theme aesthetic using CSS custom properties (--bg-primary, --text-primary, --accent-primary, etc.).
 3. Implement responsive typography (clamp()), CSS Grid (skills & projects), Flexbox (navbar & footer), and mobile media queries (@media (max-width: 768px)).
 4. Include interactive state styling: hover effects on buttons and cards, active navigation links, and mobile menu toggle transitions.
-5. Output COMPLETE CSS files without truncation or fragments.
+5. Output COMPLETE CSS files without truncation or fragments. Keep code clean and concise (around 150-250 lines) to prevent stream truncation.
 6. Output ONLY strict JSON matching the requested action schema.
 7. When 'styles.css' is complete, emit signals: 'need_qa' and 'need_integration'.
 """

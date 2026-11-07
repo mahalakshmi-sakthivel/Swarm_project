@@ -155,6 +155,24 @@ class Blackboard:
             """, (run_id, prompt, reference_image, time.time()))
             conn.commit()
 
+    def claim_seed_lock(self, run_id: str, agent_id: str) -> bool:
+        """Atomic claim ensuring only ONE agent ever seeds initial tasks for a run."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS seed_locks (
+                    run_id TEXT PRIMARY KEY,
+                    agent_id TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                )
+            """)
+            try:
+                cur.execute("INSERT INTO seed_locks (run_id, agent_id, created_at) VALUES (?, ?, ?)", (run_id, agent_id, time.time()))
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
     def get_goal(self, run_id: str) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             cur = conn.cursor()
