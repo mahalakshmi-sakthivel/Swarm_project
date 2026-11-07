@@ -88,3 +88,4 @@ pip install -r requirements.txt
 - **Stage 4**: Testing Agent, Vision Loop & Screenshot Mode `[Pending Approval]`
 - **Stage 5**: Failure Injection & Evaluation against Baselines `[Pending Approval]`
 - **Stage 6**: Polish, Documentation & Scripted Demo `[Pending Approval]`
+
