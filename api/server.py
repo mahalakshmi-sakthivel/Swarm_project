@@ -313,3 +313,11 @@ async def websocket_event_stream(websocket: WebSocket, run_id: str):
         logger.info(f"WebSocket client disconnected for run '{run_id}'")
     except Exception as e:
         logger.error(f"WebSocket error in stream for '{run_id}': {e}")
+
+
+# Serve compiled React + Vite dashboard at root if built (Stage 4)
+UI_DIST_DIR = REPO_ROOT / "ui" / "dist"
+if UI_DIST_DIR.exists():
+    from starlette.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(UI_DIST_DIR), html=True), name="ui")
+

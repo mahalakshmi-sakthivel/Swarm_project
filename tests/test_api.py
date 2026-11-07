@@ -90,6 +90,13 @@ def test_favicon_endpoint(test_client):
     assert res.status_code == 204
 
 
+def test_dashboard_root_serving(test_client):
+    res = test_client.get("/")
+    assert res.status_code == 200
+    assert "text/html" in res.headers["content-type"]
+    assert "Swarm Website Builder" in res.text or "<div id=\"root\">" in res.text
+
+
 def test_list_runs(test_client, seed_test_run):
     res = test_client.get("/runs")
     assert res.status_code == 200

@@ -1,0 +1,108 @@
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Theme Surfaces (Dark Theme Default) */
+  --bg-base: #090d16;
+  --bg-surface: #101726;
+  --bg-surface-hover: #162033;
+  --bg-card: #151d30;
+  --bg-elevated: #1e293b;
+  --bg-terminal: #070a10;
+
+  /* Borders */
+  --border-subtle: #243049;
+  --border-strong: #3b4b6d;
+  --border-accent: #3b82f6;
+
+  /* Text Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-inverse: #090d16;
+
+  /* Role Colors (UX/UI Spec Sec 10.3) */
+  --role-structure: #60a5fa;   /* HTML structure (Blue) */
+  --role-style: #e879f9;       /* CSS styling (Magenta) */
+  --role-script: #4ade80;      /* JS scripting (Green) */
+  --role-qa: #fb923c;          /* QA & audits (Amber) */
+  --role-integration: #22d3ee; /* Synthesis & integration (Cyan) */
+
+  /* Status Colors */
+  --status-ok: #4ade80;
+  --status-bad: #f87171;
+  --status-warn: #fbbf24;
+  --status-info: #60a5fa;
+  --status-idle: #94a3b8;
+
+  /* Gradients & Accents */
+  --accent-primary: #3b82f6;
+  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --accent-glow: 0 0 20px rgba(59, 130, 246, 0.35);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
