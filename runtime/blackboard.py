@@ -390,6 +390,24 @@ class Blackboard:
                 )
         return None
 
+    def list_artifacts(self, run_id: str) -> List[Artifact]:
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM artifacts WHERE run_id = ? ORDER BY created_at ASC", (run_id,))
+            rows = cur.fetchall()
+
+        return [
+            Artifact(
+                id=r["id"],
+                run_id=r["run_id"],
+                path=r["path"],
+                content_hash=r["content_hash"],
+                version=r["version"],
+                author_agent=r["author_agent"],
+                created_at=r["created_at"],
+            ) for r in rows
+        ]
+
     # --- SIGNAL ZONE (Pheromones) ---
     def emit_signal(self, run_id: str, sig_type: str, target: str, emitter: str, initial_strength: float = 1.0) -> Signal:
         """Emit or reinforce a signal on target."""
