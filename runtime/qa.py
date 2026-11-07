@@ -90,6 +90,15 @@ def audit_html(content: str) -> List[QADefect]:
 def audit_css(content: str) -> List[QADefect]:
     defects = []
 
+    if "<!DOCTYPE" in content.upper() or "<HTML" in content.upper() or "<STYLE" in content.upper():
+        defects.append(QADefect(
+            target="styles.css",
+            role_hint="style",
+            severity="critical",
+            summary="styles.css contains HTML markup instead of CSS rules",
+            remediation="styles.css must contain only pure CSS stylesheet rules, not HTML tags"
+        ))
+
     open_braces = content.count("{")
     close_braces = content.count("}")
     if open_braces != close_braces:
