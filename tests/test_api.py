@@ -151,3 +151,4 @@ def test_websocket_event_streaming(test_client, seed_test_run):
         # Second message should arrive promptly
         msg2 = ws.receive_json()
         assert msg2["type"] in ("event", "state_snapshot")
+
