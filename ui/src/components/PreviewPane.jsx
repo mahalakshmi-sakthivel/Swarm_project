@@ -99,7 +99,7 @@ export default function PreviewPane({
                 src={previewUrl}
                 title="Live Sandbox Preview"
                 className="preview-iframe"
-                sandbox="allow-scripts allow-same-origin allow-forms"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
               />
             </div>
           ) : (

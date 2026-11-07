@@ -439,12 +439,9 @@
 /* ==========================================================================
    Multiplayer Swarm Cursor & Selection Box Layer (matching user Figma mockup)
    ========================================================================== */
-.multiplayer-cursor-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 50;
+.multiplayer-cursor-layer,
+.multiplayer-cursor-layer *:not(.floating-agent-log-card):not(.floating-agent-log-card *) {
+  pointer-events: none !important;
 }
 
 /* 1. Selection Bounding Boxes */
