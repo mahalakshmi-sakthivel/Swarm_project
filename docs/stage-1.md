@@ -89,3 +89,4 @@ tests/test_stage1_e2e.py::test_stage1_agent_loop_end_to_end PASSED       [100%]
 - Output artifacts:
   - Website sandbox: `.sandbox/run_1794028907/` (`index.html`, `styles.css`, `script.js`).
   - Run database & event trace: `runs/run_1794028907/blackboard.db`, `runs/run_1794028907/events.jsonl`.
+

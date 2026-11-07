@@ -48,6 +48,36 @@ class InitialTasksPayload(BaseModel):
 T = TypeVar("T", bound=BaseModel)
 
 
+def get_schema_template(schema: Type[BaseModel]) -> str:
+    """Return a concrete example JSON template so small models don't echo schema metadata."""
+    if schema == ActionPayload:
+        return """{
+  "action": "write_file",
+  "task_id": "<task-id>",
+  "target": "<target-file>",
+  "args": {
+    "path": "<target-file>",
+    "content": "<FULL_FILE_CONTENT>"
+  },
+  "signals": [{"type": "need_qa", "target": "<target-file>"}],
+  "reasoning_summary": "Summary of completed action"
+}"""
+    elif schema == InitialTasksPayload:
+        return """{
+  "tasks": [
+    {
+      "id": "task-01-structure",
+      "title": "HTML Document Structure",
+      "description": "Semantic HTML5 layout in index.html",
+      "role_hint": "structure",
+      "target": "index.html",
+      "priority": 5
+    }
+  ]
+}"""
+    return json.dumps(schema.model_json_schema(), indent=2)
+
+
 class QwenClient:
     """Async wrapper for Ollama Qwen 3.5 calls with schema enforcement and bounded retries."""
 
@@ -69,10 +99,17 @@ class QwenClient:
         """
         async with get_gpu_semaphore():
             current_prompt = user_prompt
-            schema_json = json.dumps(schema.model_json_schema(), indent=2)
+            template_str = get_schema_template(schema)
 
             for attempt in range(max_retries + 1):
-                full_system = f"{system_prompt}\n\nSTRICT JSON ENFORCEMENT:\nYou MUST return only valid JSON matching this schema:\n{schema_json}\nDo NOT wrap in markdown or add text outside the JSON object."
+                full_system = (
+                    f"{system_prompt}\n\n"
+                    f"CRITICAL JSON OUTPUT RULES:\n"
+                    f"1. You MUST respond with ONLY a valid, raw JSON object matching this structure:\n"
+                    f"{template_str}\n"
+                    f"2. Fill in real values. NEVER output meta-schema words like 'properties', 'type': 'object', or '$defs'.\n"
+                    f"3. Do NOT wrap in markdown fences or add explanatory text outside the JSON."
+                )
                 
                 payload = {
                     "model": self.model,
@@ -109,6 +146,8 @@ class QwenClient:
                     
                     # Feed back error to model for retry
                     current_prompt = (
-                        f"{user_prompt}\n\nYour previous response was rejected due to error:\n{str(e)}\n"
-                        f"Please fix the error and output valid JSON exactly matching the schema."
+                        f"{user_prompt}\n\n"
+                        f"[RETRY NOTE - PREVIOUS OUTPUT REJECTED]: {str(e)}\n"
+                        f"Fill in actual values into this structure without schema definitions:\n{template_str}\n"
+                        f"Ensure all quotes and strings are properly closed. Output only valid JSON."
                     )

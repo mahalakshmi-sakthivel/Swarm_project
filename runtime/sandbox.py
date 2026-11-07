@@ -21,6 +21,10 @@ class Sandbox:
         self.sandbox_dir = (self.base_dir / run_id).resolve()
         self.sandbox_dir.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def root(self) -> Path:
+        return self.sandbox_dir
+
     def resolve_path(self, rel_path: str) -> Path:
         """
         Safely resolve a relative path inside the sandbox directory.

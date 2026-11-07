@@ -203,16 +203,21 @@ class Blackboard:
                 )
         return None
 
-    def list_tasks(self, run_id: str, status: Optional[str] = None) -> List[Task]:
+    def list_tasks(self, run_id: str, status: Optional[str] = None, role_hint: Optional[str] = None) -> List[Task]:
         with self._get_conn() as conn:
             cur = conn.cursor()
+            query = "SELECT * FROM tasks WHERE run_id = ?"
+            params: List[Any] = [run_id]
+
             if status:
-                cur.execute("SELECT * FROM tasks WHERE run_id = ? AND status = ? ORDER BY priority DESC, created_at ASC", (run_id, status))
-            else:
-                cur.execute("SELECT * FROM tasks WHERE run_id = ? ORDER BY priority DESC, created_at ASC", (run_id,))
+                query += " AND status = ?"
+                params.append(status)
+
+            query += " ORDER BY priority DESC, created_at ASC"
+            cur.execute(query, tuple(params))
             rows = cur.fetchall()
 
-        return [
+        all_tasks = [
             Task(
                 id=r["id"],
                 run_id=r["run_id"],
@@ -229,6 +234,22 @@ class Blackboard:
                 version=r["version"],
             ) for r in rows
         ]
+
+        if not role_hint or role_hint == "any":
+            return all_tasks
+
+        # Import role matching
+        from runtime.roles import get_role_by_hint
+        agent_role = get_role_by_hint(role_hint)
+
+        matching_tasks = []
+        for t in all_tasks:
+            if t.role_hint.lower() in (role_hint.lower(), "any"):
+                matching_tasks.append(t)
+            elif agent_role and get_role_by_hint(t.role_hint) == agent_role:
+                matching_tasks.append(t)
+
+        return matching_tasks
 
     def claim_task_atomic(self, run_id: str, task_id: str, agent_id: str, lease_duration_sec: float = 60.0) -> bool:
         """
@@ -253,16 +274,26 @@ class Blackboard:
             conn.commit()
             return cur.rowcount == 1
 
-    def update_task_status(self, run_id: str, task_id: str, agent_id: str, new_status: str) -> bool:
-        """Update task status (e.g. in_progress, done, failed). Only current owner can update."""
+    def update_task_status(self, run_id: str, task_id: str, agent_id: Optional[str], new_status: str) -> bool:
+        """Update task status (e.g. in_progress, done, failed). If resetting to 'open', clears owner and lease."""
         with self._get_conn() as conn:
             cur = conn.cursor()
-            cur.execute("""
-                UPDATE tasks
-                SET status = ?,
-                    version = version + 1
-                WHERE run_id = ? AND id = ? AND owner = ?
-            """, (new_status, run_id, task_id, agent_id))
+            if new_status == "open":
+                cur.execute("""
+                    UPDATE tasks
+                    SET status = 'open',
+                        owner = NULL,
+                        lease_expires_at = NULL,
+                        version = version + 1
+                    WHERE run_id = ? AND id = ?
+                """, (run_id, task_id))
+            else:
+                cur.execute("""
+                    UPDATE tasks
+                    SET status = ?,
+                        version = version + 1
+                    WHERE run_id = ? AND id = ? AND owner = ?
+                """, (new_status, run_id, task_id, agent_id))
             conn.commit()
             return cur.rowcount == 1
 
@@ -405,3 +436,13 @@ class Blackboard:
                         last_reinforced_at=r["last_reinforced_at"]
                     ))
             return active
+
+    def consume_signal(self, run_id: str, sig_type: str, target: Optional[str] = None):
+        """Consume or clear a signal once acted upon by an agent."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            if target:
+                cur.execute("DELETE FROM signals WHERE run_id = ? AND type = ? AND target = ?", (run_id, sig_type, target))
+            else:
+                cur.execute("DELETE FROM signals WHERE run_id = ? AND type = ?", (run_id, sig_type))
+            conn.commit()
