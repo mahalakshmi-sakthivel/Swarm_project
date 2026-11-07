@@ -85,6 +85,11 @@ def test_health_endpoint(test_client):
     assert "timestamp" in data
 
 
+def test_favicon_endpoint(test_client):
+    res = test_client.get("/favicon.ico")
+    assert res.status_code == 204
+
+
 def test_list_runs(test_client, seed_test_run):
     res = test_client.get("/runs")
     assert res.status_code == 200

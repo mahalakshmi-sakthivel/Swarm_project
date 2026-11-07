@@ -112,6 +112,12 @@ async def execute_swarm_task(run_id: str, prompt: str, model: str):
         ACTIVE_RUNS.pop(run_id, None)
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Silence browser favicon requests with 204 No Content."""
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.get("/health")
 def health_check():
     return {
