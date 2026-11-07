@@ -26,22 +26,24 @@ export default function EventFeed({ events = [] }) {
 
   // Filter events
   const filteredEvents = events.filter((ev) => {
+    const agent = ev.agent || ev.agent_id || '';
+    const eventType = ev.type || ev.event_type || '';
+
     // Role filter
     if (roleFilter !== 'all') {
-      const agentRole = ev.agent || '';
-      if (!agentRole.includes(roleFilter)) return false;
+      if (!agent.includes(roleFilter)) return false;
     }
 
     // Type filter
-    if (typeFilter !== 'all' && ev.type !== typeFilter) {
+    if (typeFilter !== 'all' && eventType !== typeFilter) {
       return false;
     }
 
     // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchAgent = ev.agent?.toLowerCase().includes(q);
-      const matchType = ev.type?.toLowerCase().includes(q);
+      const matchAgent = agent.toLowerCase().includes(q);
+      const matchType = eventType.toLowerCase().includes(q);
       const matchTarget = ev.target?.toLowerCase().includes(q);
       const matchPayload = JSON.stringify(ev.payload || {}).toLowerCase().includes(q);
       if (!matchAgent && !matchType && !matchTarget && !matchPayload) {
@@ -122,33 +124,36 @@ export default function EventFeed({ events = [] }) {
           </div>
         ) : (
           filteredEvents.map((ev, idx) => {
-            const typeColor = EVENT_TYPE_COLORS[ev.type] || '#94a3b8';
+            const eventType = ev.type || ev.event_type || 'event';
+            const agent = ev.agent || ev.agent_id || 'system';
+            const timestamp = ev.timestamp || ev.ts;
+            const typeColor = EVENT_TYPE_COLORS[eventType] || '#94a3b8';
             return (
               <div key={ev.id || idx} className="terminal-row">
-                <span className="terminal-time">{formatTime(ev.timestamp)}</span>
+                <span className="terminal-time">{formatTime(timestamp)}</span>
 
                 <span
                   className="terminal-type-chip"
                   style={{ color: typeColor, borderColor: `${typeColor}44`, backgroundColor: `${typeColor}15` }}
                 >
-                  {ev.type}
+                  {eventType}
                 </span>
 
-                <span className="terminal-agent">{ev.agent || 'system'}</span>
+                <span className="terminal-agent">{agent}</span>
 
                 {ev.target && (
                   <span className="terminal-target">[{ev.target}]</span>
                 )}
 
                 <span className="terminal-payload">
-                  {ev.type === 'file_edit' && ev.payload?.bytes
+                  {eventType === 'file_edit' && ev.payload?.bytes
                     ? `wrote ${ev.payload.bytes} bytes to ${ev.target}`
-                    : ev.type === 'task_claimed'
+                    : eventType === 'task_claimed'
                     ? `claimed task '${ev.payload?.task_id || ''}'`
-                    : ev.type === 'task_done'
+                    : eventType === 'task_done'
                     ? `completed task '${ev.payload?.task_id || ''}'`
-                    : ev.type === 'qa_audit'
-                    ? `score: ${ev.payload?.score ?? 'N/A'}/100 (passed: ${String(ev.payload?.passed)})`
+                    : eventType === 'qa_audit' || eventType === 'test_run'
+                    ? `score: ${ev.payload?.score ?? ev.payload?.composite_score ?? 'N/A'}/100 (passed: ${String(ev.payload?.passed ?? ev.payload?.converged)})`
                     : JSON.stringify(ev.payload || {})}
                 </span>
               </div>

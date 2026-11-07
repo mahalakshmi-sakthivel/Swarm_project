@@ -264,3 +264,4 @@ class VisualSimilarityScorer:
         if not recs:
             recs.append("Visual appearance aligns closely with the reference design.")
         return recs
+

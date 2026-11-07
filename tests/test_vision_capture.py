@@ -49,3 +49,4 @@ def test_capture_nonexistent_file_raises_error(tmp_path):
     nonexistent = tmp_path / "does_not_exist.html"
     with pytest.raises(FileNotFoundError):
         capturer.capture(nonexistent, tmp_path / "out.png")
+

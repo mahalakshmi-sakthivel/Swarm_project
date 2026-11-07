@@ -159,3 +159,4 @@ class ScreenshotCapture:
 
         img.save(str(output_path), "PNG")
         logger.info(f"Synthetic fallback screenshot saved to {output_path}")
+

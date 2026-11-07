@@ -111,3 +111,4 @@ def test_missing_image_file_handling(tmp_path):
     scorer = VisualSimilarityScorer()
     with pytest.raises(FileNotFoundError):
         scorer.compare(tmp_path / "nonexistent1.png", tmp_path / "nonexistent2.png")
+

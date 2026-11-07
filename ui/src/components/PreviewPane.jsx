@@ -4,6 +4,7 @@ import CursorOverlay from './CursorOverlay';
 export default function PreviewPane({
   runId,
   files = [],
+  tasks = [],
   activeEvents = [],
   reloadTrigger = 0,
 }) {
@@ -100,10 +101,6 @@ export default function PreviewPane({
                 className="preview-iframe"
                 sandbox="allow-scripts allow-same-origin allow-forms"
               />
-              <CursorOverlay
-                activeEvents={activeEvents}
-                enabled={showCursors}
-              />
             </div>
           ) : (
             <div className="preview-placeholder">
@@ -116,6 +113,14 @@ export default function PreviewPane({
               </p>
             </div>
           )}
+
+          <CursorOverlay
+            runId={runId}
+            tasks={tasks}
+            hasIndexHtml={hasIndexHtml}
+            activeEvents={activeEvents}
+            enabled={showCursors}
+          />
         </div>
       </div>
     </div>

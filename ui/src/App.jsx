@@ -58,12 +58,38 @@ export default function App() {
       // Load initial events
       const evData = await getRunEvents(runId, 0);
       setEvents(evData.events || []);
+
+      // Derive active agent status from tasks & events
+      if (details.tasks) {
+        const newAgents = {};
+        for (const t of details.tasks) {
+          if (t.role_hint) {
+            newAgents[t.role_hint] = {
+              name: t.owner || `agent-${t.role_hint}-01`,
+              role: t.role_hint,
+              status: t.status === 'in_progress' ? 'working' : t.status === 'done' ? 'done' : 'idle',
+              target: t.target || '',
+              last_activity: `${t.status}: ${t.title}`,
+            };
+          }
+        }
+        setAgents((prev) => ({ ...prev, ...newAgents }));
+      }
     } catch (err) {
       console.error(`Failed to load details for ${runId}:`, err);
     }
   }, []);
 
-  // 3. Connect WebSocket for Real-time Streaming
+  // 3. Periodic Polling Fallback (ensures live updates even if WebSocket drops)
+  useEffect(() => {
+    if (!currentRunId) return;
+    const interval = setInterval(() => {
+      fetchDetails(currentRunId);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [currentRunId, fetchDetails]);
+
+  // 4. Connect WebSocket for Real-time Streaming
   useEffect(() => {
     if (!currentRunId) return;
 
@@ -88,24 +114,32 @@ export default function App() {
           });
 
           // Update agent states
-          if (ev.agent) {
-            const roleMatch = ev.agent.match(/agent-([a-z]+)-/);
+          const agent = ev.agent || ev.agent_id;
+          const eventType = ev.type || ev.event_type;
+
+          if (agent) {
+            const roleMatch = agent.match(/agent-([a-z]+)-/);
             const role = roleMatch ? roleMatch[1] : 'general';
 
             setAgents((prev) => ({
               ...prev,
               [role]: {
-                name: ev.agent,
+                name: agent,
                 role,
-                status: ev.type === 'task_done' ? 'done' : 'working',
+                status: eventType === 'task_done' ? 'done' : 'working',
                 target: ev.target || prev[role]?.target || '',
-                last_activity: `${ev.type} on ${ev.target || 'sandbox'}`,
+                last_activity: `${eventType} on ${ev.target || 'sandbox'}`,
               },
             }));
           }
 
           // Trigger hot reload on file edits or task completions
-          if (ev.type === 'file_edit' || ev.type === 'task_done' || ev.type === 'qa_audit') {
+          if (
+            eventType === 'file_edit' ||
+            eventType === 'task_done' ||
+            eventType === 'qa_audit' ||
+            eventType === 'test_run'
+          ) {
             setReloadTrigger((v) => v + 1);
             // Refresh details in background
             fetchDetails(currentRunId);
@@ -203,6 +237,7 @@ export default function App() {
             <PreviewPane
               runId={currentRunId}
               files={files}
+              tasks={tasks}
               activeEvents={events}
               reloadTrigger={reloadTrigger}
             />
