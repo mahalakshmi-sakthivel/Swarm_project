@@ -15,12 +15,12 @@ export default function EventFeed({ events = [] }) {
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
-  const feedEndRef = useRef(null);
+  const terminalRef = useRef(null);
 
-  // Auto-scroll to bottom on new events
+  // Auto-scroll inside the terminal container ONLY (never hijacks main window scroll)
   useEffect(() => {
-    if (autoScroll && feedEndRef.current) {
-      feedEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (autoScroll && terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [events, autoScroll]);
 
@@ -117,7 +117,7 @@ export default function EventFeed({ events = [] }) {
       </div>
 
       {/* Terminal Rows */}
-      <div className="feed-terminal">
+      <div className="feed-terminal" ref={terminalRef}>
         {filteredEvents.length === 0 ? (
           <div className="empty-terminal-hint">
             Waiting for swarm events to stream over WebSocket...
@@ -160,7 +160,6 @@ export default function EventFeed({ events = [] }) {
             );
           })
         )}
-        <div ref={feedEndRef} />
       </div>
     </div>
   );

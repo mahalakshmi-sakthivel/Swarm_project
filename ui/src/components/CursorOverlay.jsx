@@ -80,22 +80,9 @@ export default function CursorOverlay({
     }));
   }, [activeEvents]);
 
-  // Compute completed tasks count
-  const doneCount = tasks.filter((t) => t.status === 'done').length;
-  const totalCount = Math.max(tasks.length, 4);
-
-  // Recent 4 completed actions for the mini agent log
-  const recentLogs = activeEvents
-    .filter((e) => {
-      const type = e.type || e.event_type;
-      return type === 'task_done' || type === 'file_edit' || type === 'task_claimed';
-    })
-    .slice(-4)
-    .reverse();
-
   return (
     <div className="multiplayer-cursor-layer">
-      {/* 1. Active Selection Bounding Boxes (matching user reference mockup) */}
+      {/* 1. Active Selection Bounding Boxes */}
       {Object.entries(positions).map(([roleKey, pos]) => {
         const roleDef = AGENT_ROLES.find((r) => r.id === roleKey) || AGENT_ROLES[0];
         if (!pos.box) return null;
@@ -167,64 +154,6 @@ export default function CursorOverlay({
           </div>
         );
       })}
-
-      {/* 3. Floating Mini AGENT LOG Widget (matching bottom-right of user image) */}
-      <div className="floating-agent-log-card">
-        <div className="mini-log-header">
-          <span className="mini-log-title">AGENT LOG</span>
-          <span className="mini-log-counter">
-            BUILT {doneCount} / {totalCount}
-          </span>
-        </div>
-
-        <div className="mini-log-entries">
-          {recentLogs.length === 0 ? (
-            <div className="mini-log-row">
-              <span className="mini-log-agent" style={{ backgroundColor: '#3b82f6', color: '#fff' }}>
-                Layout
-              </span>
-              <span className="mini-log-text">Formulating HTML structure...</span>
-            </div>
-          ) : (
-            recentLogs.map((ev, i) => {
-              const agentName = ev.agent || ev.agent_id || 'Agent';
-              const roleMatch = agentName.match(/agent-([a-z]+)-/);
-              const roleId = roleMatch ? roleMatch[1] : 'structure';
-              const roleDef = AGENT_ROLES.find((r) => r.id === roleId) || AGENT_ROLES[0];
-              const eventType = ev.type || ev.event_type;
-
-              return (
-                <div key={ev.id || i} className="mini-log-row">
-                  <span
-                    className="mini-log-agent"
-                    style={{ backgroundColor: roleDef.color, color: roleDef.textColor }}
-                  >
-                    {roleDef.name}
-                  </span>
-                  <span className="mini-log-text">
-                    {eventType === 'file_edit'
-                      ? `edited ${ev.target}`
-                      : eventType === 'task_done'
-                      ? `built ${ev.target || 'component'}`
-                      : `claimed ${ev.target}`}
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {runId && (
-          <a
-            href={`/runs/${runId}/preview/index.html`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-open-live-page"
-          >
-            Open the live page ↗
-          </a>
-        )}
-      </div>
     </div>
   );
 }
