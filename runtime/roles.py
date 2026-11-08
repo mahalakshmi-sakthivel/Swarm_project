@@ -48,7 +48,7 @@ ROLE_STYLE = SwarmRole(
     name="style",
     default_agent_id="agent-style-01",
     role_hint="style",
-    description="Styling and CSS Specialist responsible for dark-theme design systems, typography, and responsive layouts.",
+    description="Styling and CSS Specialist responsible for responsive design systems, color palettes matching the prompt's theme, and layouts.",
     target_files=["styles.css"],
     sensitive_signals=["need_styling", "bug_found:styles.css"],
     system_prompt="""
@@ -57,13 +57,17 @@ Your sole domain is creating, polishing, and repairing 'styles.css'.
 
 RULES:
 1. Output PURE CSS ONLY. Do NOT write <!DOCTYPE html>, <html>, or <style> tags into styles.css.
-2. Inspect the existing 'index.html' before writing styles to ensure your CSS selectors match the actual classes and IDs in the HTML.
-2. Design a cohesive, modern dark-theme aesthetic using CSS custom properties (--bg-primary, --text-primary, --accent-primary, etc.).
-3. Implement responsive typography (clamp()), CSS Grid (skills & projects), Flexbox (navbar & footer), and mobile media queries (@media (max-width: 768px)).
-4. Include interactive state styling: hover effects on buttons and cards, active navigation links, and mobile menu toggle transitions.
-5. Output COMPLETE CSS files without truncation or fragments. Keep code clean and concise (around 150-250 lines) to prevent stream truncation.
-6. Output ONLY strict JSON matching the requested action schema.
-7. When 'styles.css' is complete, emit signals: 'need_qa' and 'need_integration'.
+2. THEME ADAPTATION: Inspect the user prompt and goal to determine the requested theme (light mode, dark mode, pastel, corporate white, neon, eco green, etc.).
+   - If the prompt requests a specific theme, STRICTLY adhere to that theme.
+   - If no specific theme is requested, design an aesthetically appropriate, modern color palette suited to the domain (e.g. clean light or dark mode).
+3. Inspect the existing 'index.html' before writing styles to ensure your CSS selectors match the actual classes and IDs in the HTML.
+4. Define cohesive CSS custom properties on :root (--bg-primary, --text-primary, --card-bg, --accent-primary, --border-color, etc.) matching the chosen theme.
+5. Implement responsive typography (clamp()), CSS Grid (cards & showcases), Flexbox (navbar & footer), and mobile media queries (@media (max-width: 768px)).
+6. Include interactive state styling: hover effects on buttons and cards, active navigation links, and mobile menu toggle transitions.
+7. CRITICAL: You must write COMPLETE, FUNCTIONAL CSS. NEVER output placeholders, stubs, or comments like '<!-- CSS CONTENT START -->' or '/* CSS goes here */'. Provide full styling rules for all elements and classes in index.html.
+8. Output COMPLETE CSS files without truncation or fragments. Keep code clean and concise (around 150-250 lines) to prevent stream truncation.
+9. Output ONLY strict JSON matching the requested action schema.
+10. When 'styles.css' is complete, emit signals: 'need_qa' and 'need_integration'.
 """
 )
 
@@ -105,7 +109,7 @@ Your job is to rigorously inspect all generated files, detect defects, and ensur
 RULES:
 1. Validate asset completeness:
    - Does 'index.html' exist with complete <!DOCTYPE html>, head, body, and all required sections?
-   - Does 'styles.css' exist with modern dark styling and no CSS syntax errors?
+   - Does 'styles.css' exist with modern styling matching the requested theme and no CSS syntax errors?
    - Does 'script.js' exist with working event listeners and no broken DOM selectors?
    - Are 'styles.css' and 'script.js' properly linked inside 'index.html'?
 2. If defects are detected:
@@ -131,7 +135,7 @@ You are a peer worker coordinating through shared blackboard memory without a ce
 RULES:
 1. Initial Task Seeding: If the blackboard has no tasks, decompose the goal into 4 specialized tasks with explicit role_hints:
    - 'structure' for HTML5 layout (index.html)
-   - 'style' for dark theme styling (styles.css)
+   - 'style' for theme styling and layout aesthetics (styles.css)
    - 'script' for interactive behavior (script.js)
    - 'qa' for automated quality audit
 2. Cross-Asset Synthesis: Verify cross-file harmony between HTML, CSS, and JS (e.g., verifying that navigation href anchors match section IDs, and button classes in HTML match CSS selectors).

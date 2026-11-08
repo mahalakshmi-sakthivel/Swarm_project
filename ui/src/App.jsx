@@ -81,14 +81,17 @@ export default function App() {
     }
   }, []);
 
-  // 3. Periodic Polling Fallback (ensures live updates even if WebSocket drops)
+  // 3. Periodic Polling Fallback (only while run is actively building)
   useEffect(() => {
     if (!currentRunId) return;
+    if (runDetails?.status === 'converged' || runDetails?.status === 'completed' || runDetails?.status === 'failed') {
+      return;
+    }
     const interval = setInterval(() => {
       fetchDetails(currentRunId);
-    }, 2000);
+    }, 3000);
     return () => clearInterval(interval);
-  }, [currentRunId, fetchDetails]);
+  }, [currentRunId, fetchDetails, runDetails?.status]);
 
   // 4. Connect WebSocket for Real-time Streaming
   useEffect(() => {
@@ -134,19 +137,21 @@ export default function App() {
             }));
           }
 
-          // Trigger hot reload on file edits or task completions
+          // Trigger hot reload on file edits or task completions (only during active runs)
           if (
-            eventType === 'file_edit' ||
-            eventType === 'task_done' ||
-            eventType === 'qa_audit' ||
-            eventType === 'test_run'
+            (eventType === 'file_edit' || eventType === 'task_done') &&
+            runDetails?.status !== 'converged'
           ) {
             setReloadTrigger((v) => v + 1);
-            // Refresh details in background
             fetchDetails(currentRunId);
           }
         } else if (data.type === 'state_snapshot' && data.data) {
-          setRunDetails(data.data);
+          setRunDetails((prev) => ({
+            ...prev,
+            ...data.data,
+            files: (data.data.files && data.data.files.length > 0) ? data.data.files : (prev?.files || []),
+            qa: data.data.qa || prev?.qa || null,
+          }));
         }
       },
       (err) => {

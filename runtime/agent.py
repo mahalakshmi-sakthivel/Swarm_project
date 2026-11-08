@@ -62,42 +62,73 @@ class SwarmAgent:
 
     async def seed_initial_tasks(self, prompt: str) -> List[Task]:
         """
-        One-time peer seeding: Coordinator or ordinary agent splits the prompt into initial tasks.
-        Holds no ongoing command authority.
+        Instant deterministic peer seeding: Splits the goal prompt into the 4 initial tasks.
+        Seeds immediately without burning a 2-minute LLM cycle.
         """
-        logger.info(f"Agent '{self.agent_id}' seeding initial role-specialized tasks...")
-        user_prompt = f"""
-Goal prompt: "{prompt}"
+        logger.info(f"Agent '{self.agent_id}' seeding initial role-specialized tasks for: '{prompt}'...")
+        prompt_snippet = prompt[:60] + "..." if len(prompt) > 60 else prompt
 
-You are decomposing this goal into 4 specialized initial tasks:
-1. "task-01-structure": HTML Document Structure in index.html (role_hint: "structure", priority: 5, target: "index.html"). Complete layout, semantic sections, CSS and JS links.
-2. "task-02-styling": Modern Dark Theme CSS in styles.css (role_hint: "style", priority: 4, target: "styles.css"). Custom properties, responsive grid/flexbox, card styles, and animations.
-3. "task-03-script": Client-Side Interactivity in script.js (role_hint: "script", priority: 3, target: "script.js"). Mobile navigation toggle, smooth scroll behavior, card hover/active interactions.
-4. "task-04-qa": Automated Quality Assurance and Asset Audit (role_hint: "qa", priority: 1, target: "all"). Verify all assets, link integrity, and DOM selector consistency.
-
-Return a JSON object with a list of tasks matching the InitialTasksPayload schema.
-"""
-        initial_data = await self.llm.generate_structured(
-            system_prompt=self.system_prompt,
-            user_prompt=user_prompt,
-            schema=InitialTasksPayload
-        )
+        initial_tasks_def = [
+            {
+                "id": "task-01-structure",
+                "title": f"HTML Structure: {prompt_snippet}",
+                "description": f"Create complete semantic HTML5 document in index.html for: '{prompt}'. Include nav, hero, skills, projects, and contact sections. Link styles.css and script.js.",
+                "role_hint": "structure",
+                "priority": 5,
+                "target": "index.html",
+                "depends_on": []
+            },
+            {
+                "id": "task-02-styling",
+                "title": "Styling & Responsive Design System",
+                "description": (
+                    f"Design a cohesive CSS design system in styles.css tailored to the theme, color palette, and visual style "
+                    f"requested in the prompt: '{prompt}'. "
+                    f"If the user prompt specifies a theme (e.g. light, dark, pastel, neon, corporate, eco), follow that exact theme. "
+                    f"If no specific theme is requested, design an aesthetically appropriate, modern color palette suited to the domain. "
+                    f"Match all CSS selectors to index.html and ensure complete styling without placeholder stubs."
+                ),
+                "role_hint": "style",
+                "priority": 4,
+                "target": "styles.css",
+                "depends_on": ["task-01-structure"]
+            },
+            {
+                "id": "task-03-script",
+                "title": "Client-Side Interactivity",
+                "description": f"Implement vanilla JavaScript in script.js for: '{prompt}'. Add mobile menu toggle, smooth scrolling, and interactive cards.",
+                "role_hint": "script",
+                "priority": 3,
+                "target": "script.js",
+                "depends_on": ["task-01-structure"]
+            },
+            {
+                "id": "task-04-qa",
+                "title": "Automated Quality Assurance and Asset Audit",
+                "description": "Deterministic validation of HTML, CSS, and JS. Verify links, selectors, and accessibility.",
+                "role_hint": "qa",
+                "priority": 1,
+                "target": "all",
+                "depends_on": ["task-01-structure", "task-02-styling", "task-03-script"]
+            }
+        ]
 
         created_tasks = []
-        for i, t_dict in enumerate(initial_data.tasks):
+        for t_dict in initial_tasks_def:
             t = Task(
-                id=t_dict.get("id", f"task-0{i+1}"),
+                id=t_dict["id"],
                 run_id=self.run_id,
-                title=t_dict.get("title", f"Task {i+1}"),
-                description=t_dict.get("description", ""),
-                role_hint=t_dict.get("role_hint", "structure"),
+                title=t_dict["title"],
+                description=t_dict["description"],
+                role_hint=t_dict["role_hint"],
                 status="open",
-                priority=t_dict.get("priority", 1),
-                target=t_dict.get("target", "index.html")
+                priority=t_dict["priority"],
+                target=t_dict["target"],
+                depends_on=t_dict["depends_on"]
             )
             self.blackboard.add_task(t)
             created_tasks.append(t)
-            logger.info(f"Seeded task: {t.id} - {t.title} (role_hint: {t.role_hint})")
+            logger.info(f"Seeded task: {t.id} - {t.title} (role_hint: {t.role_hint}, depends_on: {t.depends_on})")
 
         return created_tasks
 
@@ -279,15 +310,27 @@ Return a JSON object with a list of tasks matching the InitialTasksPayload schem
             if not open_tasks:
                 return False
 
-        # Pick the highest priority task (fix-* tasks have priority 10)
-        target_task = open_tasks[0]
+        # Filter for tasks whose dependencies are fully resolved
+        all_tasks = self.blackboard.list_tasks(self.run_id)
+        done_task_ids = {t.id for t in all_tasks if t.status in ("done", "completed")}
 
-        # 2. DECIDE: Attempt atomic claim
+        ready_tasks = [
+            t for t in open_tasks
+            if all(dep in done_task_ids for dep in t.depends_on)
+        ]
+
+        if not ready_tasks:
+            return False
+
+        # Pick the highest priority ready task (fix-* tasks have priority 10)
+        target_task = ready_tasks[0]
+
+        # 2. DECIDE: Attempt atomic claim with safe 600s lease
         claimed = self.blackboard.claim_task_atomic(
             run_id=self.run_id,
             task_id=target_task.id,
             agent_id=self.agent_id,
-            lease_duration_sec=300.0
+            lease_duration_sec=600.0
         )
 
         if not claimed:

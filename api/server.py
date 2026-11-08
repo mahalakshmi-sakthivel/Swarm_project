@@ -291,7 +291,7 @@ async def websocket_event_stream(websocket: WebSocket, run_id: str):
     await websocket.accept()
     logger.info(f"WebSocket client connected for run '{run_id}'")
 
-    _, event_log, blackboard = get_run_components(run_id)
+    blackboard, event_log, sandbox = get_run_components(run_id)
     last_event_id = 0
 
     try:
@@ -317,13 +317,15 @@ async def websocket_event_stream(websocket: WebSocket, run_id: str):
                 tasks = blackboard.list_tasks(run_id)
                 signals = blackboard.get_active_signals(run_id)
                 artifacts = blackboard.list_artifacts(run_id)
+                files = sandbox.list_files()
                 await websocket.send_json({
                     "type": "state_snapshot",
                     "data": {
                         "status": RUN_STATUSES.get(run_id, "converged" if blackboard.is_swarm_converged(run_id) else "running"),
                         "tasks": [t.model_dump() for t in tasks],
                         "signals": [s.model_dump() for s in signals],
-                        "artifacts": [a.model_dump() for a in artifacts]
+                        "artifacts": [a.model_dump() for a in artifacts],
+                        "files": files,
                     }
                 })
 

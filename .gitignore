@@ -34,8 +34,7 @@ sandbox_temp/
 *.db
 *.sqlite
 *.sqlite3
-runs/*/artifacts/
-runs/*/tmp/
+runs/
 
 # Testing & Coverage
 .coverage

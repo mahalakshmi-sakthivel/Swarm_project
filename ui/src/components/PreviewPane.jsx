@@ -13,19 +13,34 @@ export default function PreviewPane({
 }) {
   const [viewport, setViewport] = useState('desktop'); // desktop | tablet | mobile
   const [showCursors, setShowCursors] = useState(false);
-  const [iframeKey, setIframeKey] = useState(Date.now());
+  const [hasRenderedIframe, setHasRenderedIframe] = useState(false);
   const iframeRef = useRef(null);
+  const lastReloadRef = useRef(reloadTrigger);
 
-  // Trigger hot reload when reloadTrigger changes
-  useEffect(() => {
-    if (reloadTrigger > 0) {
-      setIframeKey(Date.now());
-    }
-  }, [reloadTrigger]);
-
-  const previewUrl = runId ? `/runs/${runId}/preview/index.html?v=${iframeKey}` : null;
-  const directSiteUrl = runId ? `/runs/${runId}/preview/index.html` : null;
   const hasIndexHtml = files.includes('index.html');
+  const directSiteUrl = runId ? `/runs/${runId}/preview/index.html` : null;
+
+  useEffect(() => {
+    // Reset when runId changes
+    setHasRenderedIframe(false);
+  }, [runId]);
+
+  useEffect(() => {
+    if (hasIndexHtml) {
+      setHasRenderedIframe(true);
+    }
+  }, [hasIndexHtml]);
+
+  // Smooth reload without tearing down or remounting the iframe element
+  useEffect(() => {
+    if (!runId || (!hasIndexHtml && !hasRenderedIframe)) return;
+    if (runStatus === 'converged' || runStatus === 'completed') return;
+
+    if (reloadTrigger > lastReloadRef.current && iframeRef.current) {
+      lastReloadRef.current = reloadTrigger;
+      iframeRef.current.src = `/runs/${runId}/preview/index.html?v=${Date.now()}`;
+    }
+  }, [reloadTrigger, runId, hasIndexHtml, hasRenderedIframe, runStatus]);
 
   const getViewportWidth = () => {
     switch (viewport) {
@@ -104,12 +119,12 @@ export default function PreviewPane({
           className="preview-viewport-shell"
           style={{ width: getViewportWidth() }}
         >
-          {runId && hasIndexHtml ? (
+          {runId && (hasIndexHtml || hasRenderedIframe) ? (
             <div className="iframe-container">
               <iframe
                 ref={iframeRef}
-                key={iframeKey}
-                src={previewUrl}
+                key={runId || 'preview-frame'}
+                src={directSiteUrl ? `${directSiteUrl}?v=${runId}` : ''}
                 title="Live Sandbox Preview"
                 className="preview-iframe"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
