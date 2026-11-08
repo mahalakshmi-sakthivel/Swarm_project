@@ -158,15 +158,12 @@ class Swarm:
             while time.time() - start_time < max_seconds:
                 await asyncio.sleep(poll_interval)
 
-                all_tasks = self.blackboard.list_tasks(self.run_id)
-                open_tasks = [t for t in all_tasks if t.status in ("open", "in_progress", "claimed")]
-
                 # Check if all tasks are done and minimum initial tasks exist
-                if all_tasks and len(open_tasks) == 0:
+                if self.blackboard.is_swarm_converged(self.run_id):
                     # Verify QA status
                     qa_report = run_qa_audit(self.sandbox)
                     active_signals = self.blackboard.get_active_signals(self.run_id)
-                    pending_bugs = [s for s in active_signals if s.type == "bug_found"]
+                    pending_bugs = [s for s in active_signals if s.type in ("bug_found", "need_qa", "need_styling", "need_script")]
 
                     if qa_report.passed and not pending_bugs:
                         # If a reference image is provided, evaluate visual convergence

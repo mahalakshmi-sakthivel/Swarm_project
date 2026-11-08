@@ -310,7 +310,7 @@ class Blackboard:
                     UPDATE tasks
                     SET status = ?,
                         version = version + 1
-                    WHERE run_id = ? AND id = ? AND owner = ?
+                    WHERE run_id = ? AND id = ? AND (owner = ? OR owner IS NULL)
                 """, (new_status, run_id, task_id, agent_id))
             conn.commit()
             return cur.rowcount == 1
@@ -482,3 +482,25 @@ class Blackboard:
             else:
                 cur.execute("DELETE FROM signals WHERE run_id = ? AND type = ?", (run_id, sig_type))
             conn.commit()
+
+    def is_swarm_converged(self, run_id: str) -> bool:
+        """
+        A run is ONLY converged when:
+        1. Zero tasks are in 'open', 'claimed', or 'in_progress' states.
+        2. At least the core tasks (minimum 4) have been created and are 'done'.
+        """
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT COUNT(*) FROM tasks 
+                WHERE run_id = ? AND status IN ('open', 'claimed', 'in_progress')
+            """, (run_id,))
+            active_task_count = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*) FROM tasks 
+                WHERE run_id = ? AND status = 'done'
+            """, (run_id,))
+            done_count = cur.fetchone()[0]
+
+            return active_task_count == 0 and done_count >= 4

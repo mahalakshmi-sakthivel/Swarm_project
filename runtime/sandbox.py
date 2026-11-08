@@ -6,12 +6,58 @@ inside a temporary project folder with no access to personal files.
 
 import os
 from pathlib import Path
+import re
 from typing import List, Optional
 
 
 class SandboxSecurityViolation(Exception):
     """Raised when an agent attempts to access files outside the sandbox."""
     pass
+
+
+def sanitize_and_heal_artifact(filename: str, content: str) -> str:
+    """
+    Deterministically fixes minor LLM truncation and syntax issues before saving.
+    Guarantees:
+    - Stripped markdown code fences (```css ... ```)
+    - Auto-balanced curly braces for CSS
+    - Removal of accidental HTML tags inside CSS
+    - Relative asset links (no leading /) and auto-injected <link rel="stylesheet">
+    - Auto-closed </body> and </html>
+    """
+    # 1. Strip markdown code fences if LLM included them
+    content = re.sub(r"^```[a-zA-Z]*\r?\n", "", content.strip())
+    content = re.sub(r"\r?\n```$", "", content.strip())
+
+    if filename.endswith(".css"):
+        # Remove accidental HTML tags inside CSS (<!DOCTYPE>, <html>, <head>, <style>)
+        content = re.sub(r"</?(?:html|head|body|style|!DOCTYPE)[^>]*>", "", content, flags=re.IGNORECASE)
+        # Auto-balance unclosed curly braces at the end of truncated CSS
+        open_braces = content.count("{")
+        close_braces = content.count("}")
+        if open_braces > close_braces:
+            content += "\n" + ("}\n" * (open_braces - close_braces))
+
+    elif filename.endswith(".html"):
+        # Ensure stylesheet and script links are relative (no leading slash)
+        content = content.replace('href="/styles.css"', 'href="styles.css"')
+        content = content.replace('src="/script.js"', 'src="script.js"')
+
+        # Inject <link rel="stylesheet" href="styles.css"> if Structure Specialist forgot it
+        if "styles.css" not in content and "</head>" in content:
+            content = content.replace("</head>", '  <link rel="stylesheet" href="styles.css">\n</head>')
+
+        # Auto-close truncated HTML tags if document started <html> or <body>
+        if ("<html" in content.lower() or "<body" in content.lower()) and "</body>" not in content.lower():
+            content += "\n</body>"
+        if "<html" in content.lower() and "</html>" not in content.lower():
+            content += "\n</html>"
+
+    elif filename.endswith(".js"):
+        # Strip accidental script tags if LLM wrapped in <script>
+        content = re.sub(r"</?script[^>]*>", "", content, flags=re.IGNORECASE)
+
+    return content
 
 
 class Sandbox:
@@ -45,10 +91,11 @@ class Sandbox:
         return target_path
 
     def write_file(self, rel_path: str, content: str) -> str:
-        """Write text content to a sandboxed file."""
+        """Write sanitized, auto-healed text content to a sandboxed file."""
+        sanitized_content = sanitize_and_heal_artifact(rel_path, content)
         target_path = self.resolve_path(rel_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(content, encoding="utf-8")
+        target_path.write_text(sanitized_content, encoding="utf-8")
         return str(target_path)
 
     def read_file(self, rel_path: str) -> str:

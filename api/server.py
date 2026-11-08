@@ -99,7 +99,7 @@ async def execute_swarm_task(run_id: str, prompt: str, model: str, reference_ima
         )
 
         res = await swarm.run(max_seconds=1200.0)
-        RUN_STATUSES[run_id] = "converged" if res.get("converged") else "completed"
+        RUN_STATUSES[run_id] = "converged" if res.get("converged") else "failed"
 
         # Export events to events.jsonl
         jsonl_path = RUNS_DIR / run_id / "events.jsonl"
@@ -164,16 +164,19 @@ def list_runs():
                 db_path = d / "blackboard.db"
                 prompt = ""
                 created_at = d.stat().st_mtime
+                run_status = RUN_STATUSES.get(run_id)
                 if db_path.exists():
                     bb = Blackboard(str(db_path))
                     goal = bb.get_goal(run_id)
                     if goal:
                         prompt = goal.get("prompt", "")
                         created_at = goal.get("created_at", created_at)
+                    if not run_status:
+                        run_status = "converged" if bb.is_swarm_converged(run_id) else "incomplete"
 
                 runs.append({
                     "run_id": run_id,
-                    "status": RUN_STATUSES.get(run_id, "completed"),
+                    "status": run_status or "incomplete",
                     "prompt": prompt,
                     "created_at": created_at,
                     "is_active": run_id in ACTIVE_RUNS
@@ -272,7 +275,11 @@ def preview_sandbox_file(run_id: str, path: str = ""):
     elif path.endswith(".html"):
         mime_type = "text/html; charset=utf-8"
 
-    return FileResponse(resolved_path, media_type=mime_type or "text/plain")
+    headers = {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+    }
+    return FileResponse(resolved_path, media_type=mime_type or "text/plain", headers=headers)
 
 
 @app.websocket("/ws/runs/{run_id}")
@@ -313,7 +320,7 @@ async def websocket_event_stream(websocket: WebSocket, run_id: str):
                 await websocket.send_json({
                     "type": "state_snapshot",
                     "data": {
-                        "status": RUN_STATUSES.get(run_id, "completed"),
+                        "status": RUN_STATUSES.get(run_id, "converged" if blackboard.is_swarm_converged(run_id) else "running"),
                         "tasks": [t.model_dump() for t in tasks],
                         "signals": [s.model_dump() for s in signals],
                         "artifacts": [a.model_dump() for a in artifacts]

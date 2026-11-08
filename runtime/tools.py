@@ -9,13 +9,14 @@ from runtime.sandbox import Sandbox
 
 
 def write_file(sandbox: Sandbox, rel_path: str, content: str) -> Dict[str, Any]:
-    """Write text file inside sandbox, computing SHA-256 content hash."""
+    """Write text file inside sandbox, computing SHA-256 content hash of the sanitized artifact."""
     abs_path = sandbox.write_file(rel_path, content)
-    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    sanitized = sandbox.read_file(rel_path)
+    content_hash = hashlib.sha256(sanitized.encode("utf-8")).hexdigest()
     return {
         "path": rel_path,
         "content_hash": content_hash,
-        "bytes": len(content.encode("utf-8")),
+        "bytes": len(sanitized.encode("utf-8")),
         "absolute_path": abs_path
     }
 

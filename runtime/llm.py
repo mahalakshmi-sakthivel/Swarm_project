@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Type, TypeVar
 import requests
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger("runtime.llm")
 
@@ -33,12 +33,30 @@ def get_gpu_semaphore() -> asyncio.Semaphore:
 
 
 class ActionPayload(BaseModel):
-    action: str = Field(description="Action name: write_file, task_done, emit_signal, task_failed")
-    task_id: str = Field(description="The ID of the task being acted upon")
+    action: str = Field(default="write_file", description="Action name: write_file, task_done, emit_signal, task_failed")
+    task_id: str = Field(default="", description="The ID of the task being acted upon")
     target: str = Field(default="", description="Target file path or section id, e.g. index.html or #hero")
     args: Dict[str, Any] = Field(default_factory=dict, description="Arguments for action (e.g. path, content)")
     signals: List[Dict[str, Any]] = Field(default_factory=list, description="Optional signals to emit on blackboard")
     reasoning_summary: str = Field(default="", description="1-line summary of agent's reasoning")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_action_payload(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # If model returned "content" or "code" at top level
+            if "content" in data and "args" not in data:
+                data["args"] = {"content": data["content"], "path": data.get("path") or data.get("target") or data.get("filename", "")}
+            elif "code" in data and "args" not in data:
+                data["args"] = {"content": data["code"], "path": data.get("path") or data.get("target") or data.get("filename", "")}
+
+            # If action is missing, default to write_file or task_done
+            if not data.get("action"):
+                data["action"] = "write_file" if "args" in data or "content" in data or "code" in data else "task_done"
+
+            if not data.get("task_id"):
+                data["task_id"] = "task"
+        return data
 
 
 class InitialTasksPayload(BaseModel):
@@ -79,10 +97,20 @@ def get_schema_template(schema: Type[BaseModel]) -> str:
 
 
 def try_repair_truncated_json(raw_text: str) -> Optional[dict]:
-    """Attempt heuristic repair for JSON stream cut off near end of tokens."""
+    """Attempt heuristic repair for JSON stream cut off near end of tokens or wrapped in fences."""
+    import re
     text = raw_text.strip()
+    # Strip markdown code fences if present (e.g. ```json ... ```)
+    text = re.sub(r"^```[a-zA-Z]*\s*", "", text).strip()
+    text = re.sub(r"\s*```$", "", text).strip()
+
     if not text.startswith("{"):
-        return None
+        # Try finding the first { in the output
+        idx = text.find("{")
+        if idx != -1:
+            text = text[idx:]
+        else:
+            return None
 
     # Try candidate endings to close unclosed strings and braces
     candidates = [
@@ -165,8 +193,13 @@ class QwenClient:
                     latency = round(time.time() - t0, 2)
                     raw_text = res.json().get("response", "").strip()
 
+                    # Strip any accidental wrapping fences
+                    import re
+                    clean_text = re.sub(r"^```[a-zA-Z]*\s*", "", raw_text).strip()
+                    clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+
                     try:
-                        parsed_json = json.loads(raw_text)
+                        parsed_json = json.loads(clean_text)
                     except json.JSONDecodeError as decode_err:
                         repaired = try_repair_truncated_json(raw_text)
                         if repaired is not None:
