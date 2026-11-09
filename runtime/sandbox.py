@@ -30,7 +30,8 @@ def sanitize_and_heal_artifact(filename: str, content: str) -> str:
     content = re.sub(r"\r?\n```$", "", content.strip())
 
     if filename.endswith(".css"):
-        # Remove accidental HTML tags inside CSS (<!DOCTYPE>, <html>, <head>, <style>)
+        # Remove accidental HTML comments or tags inside CSS (<!DOCTYPE>, <html>, <head>, <style>, <!-- -->)
+        content = re.sub(r"<!--[\s\S]*?-->", "", content)
         content = re.sub(r"</?(?:html|head|body|style|!DOCTYPE)[^>]*>", "", content, flags=re.IGNORECASE)
         # Auto-balance unclosed curly braces at the end of truncated CSS
         open_braces = content.count("{")

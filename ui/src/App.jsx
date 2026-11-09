@@ -109,7 +109,31 @@ export default function App() {
     const sub = subscribeToRun(
       currentRunId,
       (data) => {
-        if (data.type === 'event' && data.data) {
+        if (data.type === 'history_event' && data.data) {
+          const ev = data.data;
+          setEvents((prev) => {
+            if (prev.some((e) => e.id === ev.id)) return prev;
+            return [...prev, ev];
+          });
+
+          // Sync agent states from history without reloading preview
+          const agent = ev.agent || ev.agent_id;
+          const eventType = ev.type || ev.event_type;
+          if (agent) {
+            const roleMatch = agent.match(/agent-([a-z]+)-/);
+            const role = roleMatch ? roleMatch[1] : 'general';
+            setAgents((prev) => ({
+              ...prev,
+              [role]: {
+                name: agent,
+                role,
+                status: eventType === 'task_done' ? 'done' : 'working',
+                target: ev.target || prev[role]?.target || '',
+                last_activity: `${eventType} on ${ev.target || 'sandbox'}`,
+              },
+            }));
+          }
+        } else if (data.type === 'event' && data.data) {
           const ev = data.data;
           setEvents((prev) => {
             // Avoid duplicate event ids
@@ -137,13 +161,13 @@ export default function App() {
             }));
           }
 
-          // Trigger hot reload on file edits or task completions (only during active runs)
-          if (
-            (eventType === 'file_edit' || eventType === 'task_done') &&
-            runDetails?.status !== 'converged'
-          ) {
-            setReloadTrigger((v) => v + 1);
-            fetchDetails(currentRunId);
+          // Smoothly trigger reload only on live file edits (debounced by 300ms)
+          if (eventType === 'file_edit' && runDetails?.status !== 'converged') {
+            if (window._reloadTimer) clearTimeout(window._reloadTimer);
+            window._reloadTimer = setTimeout(() => {
+              setReloadTrigger((v) => v + 1);
+              fetchDetails(currentRunId);
+            }, 300);
           }
         } else if (data.type === 'state_snapshot' && data.data) {
           setRunDetails((prev) => ({

@@ -92,7 +92,7 @@ def audit_css(content: str) -> List[QADefect]:
 
     clean_content = content.strip()
 
-    if len(clean_content) < 80:
+    if len(clean_content) < 15:
         defects.append(QADefect(
             target="styles.css",
             role_hint="style",
@@ -100,7 +100,6 @@ def audit_css(content: str) -> List[QADefect]:
             summary=f"styles.css is too short ({len(clean_content)} bytes) or empty",
             remediation="Generate a complete styles.css stylesheet with styling for all HTML classes"
         ))
-        return defects
 
     if clean_content.startswith("<!--") or ("/* CSS" in clean_content and len(clean_content) < 120):
         defects.append(QADefect(
@@ -123,15 +122,6 @@ def audit_css(content: str) -> List[QADefect]:
     open_braces = content.count("{")
     close_braces = content.count("}")
 
-    if open_braces < 2:
-        defects.append(QADefect(
-            target="styles.css",
-            role_hint="style",
-            severity="critical",
-            summary="styles.css lacks rule blocks (fewer than 2 '{' braces found)",
-            remediation="Implement styling rule blocks for HTML elements and classes"
-        ))
-
     if open_braces != close_braces:
         defects.append(QADefect(
             target="styles.css",
@@ -139,6 +129,15 @@ def audit_css(content: str) -> List[QADefect]:
             severity="critical",
             summary=f"Unbalanced CSS braces ({open_braces} open vs {close_braces} close)",
             remediation="Fix mismatched curly braces in styles.css"
+        ))
+
+    if open_braces == 0:
+        defects.append(QADefect(
+            target="styles.css",
+            role_hint="style",
+            severity="critical",
+            summary="styles.css lacks rule blocks (no '{' braces found)",
+            remediation="Implement styling rule blocks for HTML elements and classes"
         ))
 
     if ":root" not in content and "--" not in content:

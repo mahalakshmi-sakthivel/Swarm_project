@@ -295,10 +295,10 @@ async def websocket_event_stream(websocket: WebSocket, run_id: str):
     last_event_id = 0
 
     try:
-        # Stream all initial historical events
+        # Stream all initial historical events without triggering hot reload storm
         initial_events = event_log.get_events(run_id, since_id=0)
         for ev in initial_events:
-            await websocket.send_json({"type": "event", "data": ev.model_dump()})
+            await websocket.send_json({"type": "history_event", "data": ev.model_dump()})
             if ev.id and ev.id > last_event_id:
                 last_event_id = ev.id
 

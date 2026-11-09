@@ -99,7 +99,7 @@ export default function PreviewPane({
             {showCursors ? '👁️ Cursors ON' : '🙈 Cursors OFF'}
           </button>
 
-          {previewUrl && hasIndexHtml && (
+          {directSiteUrl && (hasIndexHtml || hasRenderedIframe) && (
             <a
               href={directSiteUrl}
               target="_blank"

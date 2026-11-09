@@ -71,8 +71,13 @@ class SwarmAgent:
         initial_tasks_def = [
             {
                 "id": "task-01-structure",
-                "title": f"HTML Structure: {prompt_snippet}",
-                "description": f"Create complete semantic HTML5 document in index.html for: '{prompt}'. Include nav, hero, skills, projects, and contact sections. Link styles.css and script.js.",
+                "title": f"HTML5 Structure for '{prompt_snippet}'",
+                "description": (
+                    f"Create a complete, rich semantic HTML5 document in index.html tailored precisely to the user's requirements: '{prompt}'. "
+                    f"Design meaningful sections, headers, cards, data displays, interactive forms, or widgets directly reflecting the prompt requirements. "
+                    f"Include a responsive navigation bar, a compelling hero/header section, rich content sections specific to the website type, and a footer. "
+                    f"Link styles.css in <head> and script.js with defer. Ensure all elements have clear semantic class names and IDs."
+                ),
                 "role_hint": "structure",
                 "priority": 5,
                 "target": "index.html",
@@ -80,13 +85,14 @@ class SwarmAgent:
             },
             {
                 "id": "task-02-styling",
-                "title": "Styling & Responsive Design System",
+                "title": "Design System & Responsive Styles (styles.css)",
                 "description": (
-                    f"Design a cohesive CSS design system in styles.css tailored to the theme, color palette, and visual style "
-                    f"requested in the prompt: '{prompt}'. "
-                    f"If the user prompt specifies a theme (e.g. light, dark, pastel, neon, corporate, eco), follow that exact theme. "
-                    f"If no specific theme is requested, design an aesthetically appropriate, modern color palette suited to the domain. "
-                    f"Match all CSS selectors to index.html and ensure complete styling without placeholder stubs."
+                    f"Design a complete, polished CSS design system in styles.css strictly adhering to the theme and requirements in: '{prompt}'. "
+                    f"THEME INSTRUCTION: If the prompt specifies a theme (e.g. light mode, dark mode, pastel, corporate blue/gray, vibrant neon, warm earth tones), "
+                    f"implement that exact theme. If unspecified, pick a modern, domain-appropriate color palette. "
+                    f"Define cohesive CSS custom properties in :root (--bg-primary, --bg-surface, --text-primary, --text-secondary, --accent, --card-bg, --border). "
+                    f"Style all sections, cards, tables, buttons, and navigation from index.html. Include responsive @media rules for mobile. "
+                    f"CRITICAL: Output 100% full functional CSS. Never output comments-only, stubs, or placeholders."
                 ),
                 "role_hint": "style",
                 "priority": 4,
@@ -95,8 +101,13 @@ class SwarmAgent:
             },
             {
                 "id": "task-03-script",
-                "title": "Client-Side Interactivity",
-                "description": f"Implement vanilla JavaScript in script.js for: '{prompt}'. Add mobile menu toggle, smooth scrolling, and interactive cards.",
+                "title": "Client-Side Functionality & Interactivity (script.js)",
+                "description": (
+                    f"Implement clean vanilla ES6+ JavaScript in script.js to power the interactive features required for: '{prompt}'. "
+                    f"Provide dynamic functionality matching the elements present in index.html (e.g., mobile navigation toggle, "
+                    f"live calculations, data filtering, modal dialogs, smooth scrolling, tab switching, or simulated real-time updates). "
+                    f"Wrap all DOM lookups with null checks so no runtime errors occur. Output full working JavaScript."
+                ),
                 "role_hint": "script",
                 "priority": 3,
                 "target": "script.js",
@@ -355,12 +366,19 @@ class SwarmAgent:
         if self.sandbox.file_exists(target_file):
             current_content = f"\nExisting content of '{target_file}':\n```\n{self.sandbox.read_file(target_file)}\n```\n"
 
+        # Retrieve overarching user goal prompt from blackboard
+        goal_data = self.blackboard.get_goal(self.run_id) or {}
+        user_goal_prompt = goal_data.get("prompt", "")
+
         # Also supply index.html context to style and script agents so they match DOM selectors
         context_files = ""
         if target_file != "index.html" and self.sandbox.file_exists("index.html"):
             context_files = f"\nReference 'index.html' (match your selectors to this markup):\n```\n{self.sandbox.read_file('index.html')}\n```\n"
 
         user_prompt = f"""
+OVERALL WEBSITE GOAL & REQUIREMENTS:
+"{user_goal_prompt}"
+
 Current Task: {target_task.title}
 Task ID: {target_task.id}
 Description: {target_task.description}
