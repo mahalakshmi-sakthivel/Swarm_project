@@ -87,11 +87,14 @@ class SwarmAgent:
                 "id": "task-02-styling",
                 "title": "Design System & Responsive Styles (styles.css)",
                 "description": (
-                    f"Design a complete, polished CSS design system in styles.css strictly adhering to the theme and requirements in: '{prompt}'. "
-                    f"THEME INSTRUCTION: If the prompt specifies a theme (e.g. light mode, dark mode, pastel, corporate blue/gray, vibrant neon, warm earth tones), "
-                    f"implement that exact theme. If unspecified, pick a modern, domain-appropriate color palette. "
-                    f"Define cohesive CSS custom properties in :root (--bg-primary, --bg-surface, --text-primary, --text-secondary, --accent, --card-bg, --border). "
-                    f"Style all sections, cards, tables, buttons, and navigation from index.html. Include responsive @media rules for mobile. "
+                    f"Design a complete, vibrant CSS design system in styles.css strictly adhering to the theme and requirements in: '{prompt}'. "
+                    f"THEME INSTRUCTION: If the prompt specifies a theme (e.g. dark theme, cyberpunk neon, clean light mode, pastel, warm earth tones, fintech navy/emerald), "
+                    f"strictly implement that exact theme with high visual fidelity. If unspecified, pick a rich modern color palette. "
+                    f"Define cohesive CSS custom properties in :root (--bg-primary, --bg-secondary, --bg-card, --text-primary, --text-secondary, "
+                    f"--accent-primary, --accent-secondary, --accent-gradient, --border, --shadow-lg). "
+                    f"NEVER use dull gray or plain monochrome for accents. Implement badges/pills (.badge, .tag), "
+                    f"interactive cards with smooth hover elevation and shadow (.card, .feature-card), vibrant primary buttons with hover glow (.btn-primary), "
+                    f"outline secondary buttons (.btn-secondary), form focus rings, and alternating section contrast. Include responsive @media rules for mobile. "
                     f"CRITICAL: Output 100% full functional CSS. Never output comments-only, stubs, or placeholders."
                 ),
                 "role_hint": "style",
