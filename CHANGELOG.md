@@ -2,6 +2,37 @@
 
 All notable changes to the Swarm Website Builder project will be documented in this file.
 
+## [Phase 6: Smaller Reliable LLM Calls, Content Agent, Model Config & HTML Healer] - 2026-11-10
+### Added
+- `runtime/healer.py`:
+  - Zero-dependency `HTMLTagHealer` and `heal_html_markup(raw_html)` based on Python's built-in `html.parser.HTMLParser`.
+  - Automatically balances and closes unclosed HTML tags in LIFO order while preserving void tags (`<img>`, `<input>`, `<br>`, `<meta>`, `<link>`) without invalid closing tags.
+- `runtime/content.py`:
+  - `SiteCopy`, `PageCopy`, and `PageSectionCopy` models for structured, authentic marketing and UI copywriting.
+  - `generate_default_copy(spec: SiteSpec)`: Tone-tailored copy synthesizer (playful, elegant, bold, professional) guaranteeing zero placeholder text, zero "Lorem ipsum", and zero "TODO" tags.
+  - Integration with `task-00-plan` and the new Content Agent to record `copy.json` in the sandbox as a shared artifact.
+- `ROLE_CONTENT` in `runtime/roles.py`:
+  - New 6th specialized peer agent: Content Copywriting Specialist (`agent-content-01`).
+  - Specialized system prompt strictly forbidding placeholders and mandating tone-tailored copy.
+  - Added to `ALL_ROLES` and `ROLE_ALIASES`.
+- `ModelConfig` and LLM Telemetry in `runtime/llm.py`:
+  - `ModelConfig` dataclass with swappable model support (`DEFAULT_MODEL="qwen3.5:4b"`, fallback `FALLBACK_MODEL="qwen2.5-coder:7b"`), code temperature (0.2), and copywriting temperature (0.6).
+  - `set_model(model_name)`: Dynamic model hot swapping.
+  - Real-time token throughput tracking (`tokens_per_sec = eval_count / (eval_duration / 1e9)`), latency logging, and per-agent failure counters (`agent_telemetry`).
+  - `get_telemetry_summary()`: Aggregated telemetry for dashboard and reporting.
+- Prompt token budgeting in `runtime/agent.py`:
+  - Keeps prompts strictly under ~1500 tokens for local 4B model reliability.
+  - Replaces massive raw HTML file dumps with concise DOM selector outlines (`#id` inventory and class lists) for style and script specialists.
+  - Injects `copy_context` from `copy.json` into structure prompts.
+- `tests/test_phase6.py`: 11 unit tests verifying HTML tag healing, void element preservation, model configuration, telemetry metrics, `ROLE_CONTENT` registration, and tone-matched copy generation.
+
+### Changed
+- `runtime/render.py`: Automatically runs `heal_html_markup` on `<main>` content before page assembly.
+- `runtime/swarm.py`: Added `ROLE_CONTENT` to the concurrent multi-agent worker set.
+- `tests/test_stage2_roles.py`: Updated tests to verify all 6 swarm roles and aliases.
+
+---
+
 ## [Phase 5: Real Deterministic QA Suite & Strict Convergence] - 2026-11-10
 ### Added
 - Complete rewrite of `runtime/qa.py` with 9 deterministic rules producing structured defect records (`{target, line, rule, severity, summary, remediation, req_id}`):

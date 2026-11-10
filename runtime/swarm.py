@@ -28,7 +28,8 @@ from runtime.roles import (
     ROLE_STYLE,
     ROLE_SCRIPT,
     ROLE_QA,
-    ROLE_COORDINATOR
+    ROLE_COORDINATOR,
+    ROLE_CONTENT
 )
 from runtime.sandbox import Sandbox
 from runtime.vision.feedback import VisionFeedbackLoop
@@ -112,6 +113,16 @@ class Swarm:
                 sandbox=self.sandbox,
                 llm_client=self.llm_client,
                 system_prompt=ROLE_QA.system_prompt
+            ),
+            SwarmAgent(
+                agent_id=ROLE_CONTENT.default_agent_id,
+                role=ROLE_CONTENT.name,
+                run_id=self.run_id,
+                blackboard=self.blackboard,
+                event_log=self.event_log,
+                sandbox=self.sandbox,
+                llm_client=self.llm_client,
+                system_prompt=ROLE_CONTENT.system_prompt
             ),
         ]
 

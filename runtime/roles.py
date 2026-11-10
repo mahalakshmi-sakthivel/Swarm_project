@@ -161,12 +161,32 @@ RULES:
 """
 )
 
+ROLE_CONTENT = SwarmRole(
+    name="content",
+    default_agent_id="agent-content-01",
+    role_hint="content",
+    description="Content Copywriting Specialist responsible for real, engaging marketing headlines, body copy, feature blurbs, and CTAs matching spec.tone with zero lorem ipsum or placeholders.",
+    target_files=["copy.json"],
+    sensitive_signals=["need_content", "need_copy"],
+    system_prompt="""
+You are the Content Copywriting Specialist in a decentralized swarm.
+Your domain is crafting authentic, engaging, production-grade website copy in 'copy.json' matching the exact tone, audience, and brand defined in spec.json.
+
+RULES:
+1. ZERO PLACEHOLDERS: NEVER output 'Lorem ipsum', 'TODO', 'Your text here', 'Feature blurb', or unclosed quotes.
+2. TONE & AUDIENCE MATCH: Write compelling headlines, subheadings, feature benefits, call-to-action button labels, and image alt text tailored to spec.tone (e.g. elegant, playful, technical, bold, minimalist).
+3. PAGE SECTIONS: Provide copy for every page and section defined in spec.pages.
+4. Output ONLY strict JSON matching the requested action or SiteCopy schema.
+"""
+)
+
 ALL_ROLES: Dict[str, SwarmRole] = {
     "structure": ROLE_STRUCTURE,
     "style": ROLE_STYLE,
     "script": ROLE_SCRIPT,
     "qa": ROLE_QA,
     "integration": ROLE_COORDINATOR,
+    "content": ROLE_CONTENT,
 }
 
 
@@ -176,6 +196,7 @@ ROLE_ALIASES = {
     "script": ["script", "javascript", "js", "interactivity"],
     "qa": ["qa", "critic", "test", "audit", "verifier"],
     "integration": ["integration", "coordinator", "manager", "lead"],
+    "content": ["content", "copy", "copywriter", "text", "copywriting"],
 }
 
 

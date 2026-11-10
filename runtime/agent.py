@@ -438,6 +438,42 @@ class SwarmAgent:
                 payload={"bytes": base_res["bytes"], "summary": f"Generated base.css ({spec.theme.mood} theme) with complete component library"}
             )
 
+            # Generate and record deterministic copy.json matching spec.tone (Phase 6)
+            from runtime.content import generate_default_copy
+            site_copy = generate_default_copy(spec)
+            copy_json_str = site_copy.model_dump_json(indent=2)
+            copy_res = self.sandbox.write_file("copy.json", copy_json_str)
+            self.blackboard.record_artifact(
+                run_id=self.run_id,
+                path="copy.json",
+                content_hash=copy_res["content_hash"],
+                author_agent=self.agent_id
+            )
+            self.event_log.append(
+                run_id=self.run_id,
+                agent_id=self.agent_id,
+                event_type="file_edit",
+                target="copy.json",
+                payload={"bytes": copy_res["bytes"], "summary": f"Generated copy.json with tone '{spec.tone}' and zero lorem ipsum"}
+            )
+
+            # Seed Content Copywriting task for specialized tone polish
+            content_task = Task(
+                id="task-00-content",
+                run_id=self.run_id,
+                title=f"Brand Copywriting ({spec.tone} tone)",
+                description=(
+                    f"Refine authentic marketing headlines, CTAs, and feature copy for {spec.brand_name} matching {spec.tone} tone in copy.json. "
+                    f"ZERO lorem ipsum or placeholders."
+                ),
+                role_hint="content",
+                status="open",
+                priority=8,
+                target="copy.json",
+                depends_on=["task-00-plan"]
+            )
+            self.blackboard.add_task(content_task)
+
             # Dynamically seed structure tasks for all pages in spec.pages
             structure_task_ids = []
             for idx, p in enumerate(spec.pages):
@@ -497,6 +533,39 @@ class SwarmAgent:
             self.current_task = None
             return True
 
+        # Handle Content Copywriting task (Phase 6)
+        if target_task.id == "task-00-content" or self.role_hint == "content":
+            logger.info(f"Content agent '{self.agent_id}' crafting brand copy for: '{user_goal_prompt}'...")
+            from runtime.content import generate_default_copy
+            import json
+            try:
+                spec_raw = json.loads(self.sandbox.read_file("spec.json"))
+                spec_obj = SiteSpec(**spec_raw)
+                default_copy = generate_default_copy(spec_obj)
+                copy_str = default_copy.model_dump_json(indent=2)
+                write_res = self.sandbox.write_file("copy.json", copy_str)
+                self.blackboard.record_artifact(self.run_id, "copy.json", write_res["content_hash"], self.agent_id)
+                self.event_log.append(
+                    run_id=self.run_id,
+                    agent_id=self.agent_id,
+                    event_type="file_edit",
+                    target="copy.json",
+                    payload={"bytes": write_res["bytes"], "summary": f"Crafted tone-matched copy for {spec_obj.brand_name}"}
+                )
+            except Exception as ce:
+                logger.warning(f"Error generating copy.json: {ce}")
+
+            self.blackboard.update_task_status(self.run_id, target_task.id, self.agent_id, "done")
+            self.event_log.append(
+                run_id=self.run_id,
+                agent_id=self.agent_id,
+                event_type="task_done",
+                target="copy.json",
+                payload={"task_id": target_task.id}
+            )
+            self.current_task = None
+            return True
+
         # For all other tasks, assemble prompt with shared spec.json contract
         existing_files = self.sandbox.list_files()
         target_file = target_task.target.split(",")[0].strip() if target_task.target else "index.html"
@@ -506,12 +575,29 @@ class SwarmAgent:
 
         spec_contract = ""
         if self.sandbox.file_exists("spec.json"):
-            spec_contract = f"\nSHARED SITE SPECIFICATION CONTRACT (spec.json - STRICTLY FOLLOW THIS):\n```json\n{self.sandbox.read_file('spec.json')}\n```\n"
+            import json
+            try:
+                raw_spec_data = json.loads(self.sandbox.read_file("spec.json"))
+                req_snippets = [f"{r.get('id', '')}: {r.get('description', '')}" for r in raw_spec_data.get('requirements', [])[:8]]
+                req_summary = ", ".join(req_snippets)
+                pages_list = ", ".join(p.get("file", "") for p in raw_spec_data.get("pages", []))
+                # Budgeted concise summary for 4B model under 1500 tokens
+                spec_contract = (
+                    f"\nSITE SPECIFICATION SUMMARY:\n"
+                    f"- Type: {raw_spec_data.get('site_type')} | Brand: {raw_spec_data.get('brand_name')} | Tone: {raw_spec_data.get('tone')}\n"
+                    f"- Tagline: {raw_spec_data.get('tagline')}\n"
+                    f"- Target Audience: {raw_spec_data.get('audience')}\n"
+                    f"- Pages: {pages_list}\n"
+                    f"- Requirements: {req_summary}\n"
+                )
+            except Exception:
+                spec_contract = f"\nSHARED SITE SPECIFICATION CONTRACT:\n```json\n{self.sandbox.read_file('spec.json')}\n```\n"
 
         # Supply generated HTML pages and base design system context to style and script agents
         context_files = ""
         few_shot_block = ""
         starter_template_block = ""
+        copy_context = ""
 
         if target_file.endswith(".html") and self.sandbox.file_exists("spec.json"):
             from runtime.templates import get_few_shot_example, load_starter_template, fill_template_placeholders
@@ -533,16 +619,39 @@ class SwarmAgent:
                         f"```html\n{hydrated_template}\n```\n"
                         f"Fill in realistic content matching the brand tone, retain standard component classes (.container, .section, .hero, .grid, .card, .btn), and satisfy all user requirements.\n"
                     )
+
+                if self.sandbox.file_exists("copy.json"):
+                    copy_raw = json.loads(self.sandbox.read_file("copy.json"))
+                    p_copy = next((pc for pc in copy_raw.get("pages", []) if pc.get("page_id") == matching_page.id), None)
+                    if p_copy:
+                        copy_context = (
+                            f"\nAPPROVED BRAND COPY (USE THIS COPY INSTEAD OF PLACEHOLDERS):\n"
+                            f"- Headline: {p_copy.get('headline')}\n"
+                            f"- Tagline: {p_copy.get('subheadline')}\n"
+                            f"- Primary CTA: {p_copy.get('cta_primary')}\n"
+                        )
             except Exception as e:
                 logger.warning(f"Failed loading template context: {e}")
 
         elif target_file in ("styles.css", "script.js"):
-            html_snippets = []
+            import re
+            all_ids = set()
+            all_classes = set()
             for f in self.sandbox.list_files():
                 if f.endswith(".html"):
-                    html_snippets.append(f"--- {f} ---\n{self.sandbox.read_file(f)}")
-            if html_snippets:
-                context_files = f"\nGENERATED HTML MARKUP (match your code to these actual IDs and classes):\n```\n" + "\n\n".join(html_snippets) + "\n```\n"
+                    content = self.sandbox.read_file(f)
+                    all_ids.update(re.findall(r'id=["\']([^"\']+)["\']', content))
+                    for m in re.findall(r'class=["\']([^"\']+)["\']', content):
+                        for c in m.split():
+                            all_classes.add(f".{c}")
+            
+            id_list = sorted(list(all_ids))[:25]
+            cls_list = sorted(list(all_classes))[:35]
+            context_files = (
+                f"\nACTIVE HTML DOM SELECTORS (match your code to these actual elements):\n"
+                f"- Existing IDs: {', '.join(f'#{i}' for i in id_list)}\n"
+                f"- Existing Classes: {', '.join(cls_list)}\n"
+            )
             if target_file == "styles.css" and self.sandbox.file_exists("base.css"):
                 context_files += (
                     f"\nNOTE: base.css is already active and provides :root variables and all base component styles.\n"
@@ -562,6 +671,7 @@ Description: {target_task.description}
 Target File: {target_file}
 Existing files in workspace: {existing_files}
 {current_content}
+{copy_context}
 {few_shot_block}
 {starter_template_block}
 {context_files}
@@ -575,7 +685,9 @@ Decide your action:
             action_data: ActionPayload = await self.llm.generate_structured(
                 system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
-                schema=ActionPayload
+                schema=ActionPayload,
+                agent_id=self.agent_id,
+                role_hint=self.role_hint
             )
 
             # Execute write_file action

@@ -14,6 +14,7 @@ from typing import Optional
 from jinja2 import Template
 from runtime.spec import PageSpec, SiteSpec
 from runtime.theme import get_google_fonts_link
+from runtime.healer import heal_html_markup
 
 PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -145,15 +146,17 @@ def extract_clean_main_content(raw_html: str) -> str:
 def render_full_page(spec: SiteSpec, page: PageSpec, raw_main_content: str) -> str:
     """
     Renders the complete, fully formed HTML document for a specific page in the SiteSpec.
+    Applies parser-based markup healing to guarantee balanced and properly closed tags.
     """
     clean_main = extract_clean_main_content(raw_main_content)
+    healed_main = heal_html_markup(clean_main)
     fonts_markup = get_google_fonts_link(spec.theme.font_heading, spec.theme.font_body)
 
     return _compiled_template.render(
         spec=spec,
         page=page,
         pages=spec.pages,
-        main_content=clean_main,
+        main_content=healed_main,
         google_fonts_markup=fonts_markup
     )
 

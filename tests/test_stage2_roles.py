@@ -13,13 +13,14 @@ from runtime.roles import (
     ROLE_SCRIPT,
     ROLE_QA,
     ROLE_COORDINATOR,
+    ROLE_CONTENT,
     get_role_by_hint
 )
 
 
-def test_all_five_roles_registered():
-    assert len(ALL_ROLES) == 5
-    assert set(ALL_ROLES.keys()) == {"structure", "style", "script", "qa", "integration"}
+def test_all_six_roles_registered():
+    assert len(ALL_ROLES) == 6
+    assert set(ALL_ROLES.keys()) == {"structure", "style", "script", "qa", "integration", "content"}
 
 
 def test_role_attributes_and_system_prompts():
@@ -41,6 +42,8 @@ def test_role_resolution_by_hint_and_aliases():
     assert get_role_by_hint("Critic") == ROLE_QA
     assert get_role_by_hint("integration") == ROLE_COORDINATOR
     assert get_role_by_hint("Coordinator") == ROLE_COORDINATOR
+    assert get_role_by_hint("content") == ROLE_CONTENT
+    assert get_role_by_hint("Copywriter") == ROLE_CONTENT
 
 
 def test_sensitive_signals():

@@ -204,3 +204,4 @@ def test_full_qa_audit_strict_convergence(tmp_path):
     assert report.passed is True, f"Expected clean pass, defects: {[d.summary for d in report.defects]}"
     assert report.score >= 90.0
     assert report.coverage_percent == 100.0
+

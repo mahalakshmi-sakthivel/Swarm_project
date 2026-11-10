@@ -7,6 +7,7 @@ Implements Non-Negotiable Rules:
 - Hardware-aware serialized requests (Semaphore = 1) to protect laptop GPU
 """
 
+from dataclasses import dataclass, field
 import asyncio
 import json
 import logging
@@ -20,6 +21,18 @@ logger = logging.getLogger("runtime.llm")
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "qwen3.5:4b")
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "qwen2.5-coder:7b")
+
+
+@dataclass
+class ModelConfig:
+    """Configuration for local LLM inference with swappable model and task-specific parameters."""
+    model_name: str = os.getenv("SWARM_MODEL", DEFAULT_MODEL)
+    fallback_model: str = os.getenv("SWARM_FALLBACK_MODEL", FALLBACK_MODEL)
+    code_temperature: float = 0.2
+    copy_temperature: float = 0.6
+    num_predict: int = 2048
+    num_ctx: int = 8192
 
 # Global lazy semaphore to serialize model calls and prevent GPU VRAM overload
 _GPU_SEMAPHORE: Optional[asyncio.Semaphore] = None
@@ -136,11 +149,50 @@ def try_repair_truncated_json(raw_text: str) -> Optional[dict]:
 
 
 class QwenClient:
-    """Async wrapper for Ollama Qwen 3.5 calls with schema enforcement and bounded retries."""
+    """Async wrapper for Ollama Qwen 3.5 calls with schema enforcement, swappable models, and telemetry."""
 
-    def __init__(self, model: str = DEFAULT_MODEL, host: str = OLLAMA_HOST):
-        self.model = model
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        host: str = OLLAMA_HOST,
+        config: Optional[ModelConfig] = None
+    ):
+        self.config = config or ModelConfig()
+        self.model = model or self.config.model_name
         self.host = host
+        # Telemetry storage: agent_id -> metrics
+        self.agent_telemetry: Dict[str, Dict[str, Any]] = {}
+        self.call_history: List[Dict[str, Any]] = []
+
+    def set_model(self, model_name: str):
+        """Hot-swap the active model (e.g. switch to qwen2.5-coder:7b fallback)."""
+        logger.info(f"Swapping active LLM model from '{self.model}' to '{model_name}'")
+        self.model = model_name
+        self.config.model_name = model_name
+
+    def record_agent_failure(self, agent_id: str):
+        """Increment failure counter for a specific agent."""
+        if agent_id not in self.agent_telemetry:
+            self.agent_telemetry[agent_id] = {
+                "total_calls": 0, "success_calls": 0, "failed_calls": 0,
+                "total_eval_tokens": 0, "total_eval_duration_sec": 0.0, "avg_tokens_per_sec": 0.0
+            }
+        self.agent_telemetry[agent_id]["failed_calls"] += 1
+
+    def get_telemetry_summary(self) -> Dict[str, Any]:
+        """Return aggregated telemetry for tokens/sec, latency, and per-agent failures."""
+        total_tokens = sum(m["total_eval_tokens"] for m in self.agent_telemetry.values())
+        total_time = sum(m["total_eval_duration_sec"] for m in self.agent_telemetry.values())
+        overall_tps = round(total_tokens / total_time, 2) if total_time > 0 else 0.0
+
+        return {
+            "model": self.model,
+            "overall_tokens_per_sec": overall_tps,
+            "total_eval_tokens": total_tokens,
+            "total_calls": sum(m["total_calls"] for m in self.agent_telemetry.values()),
+            "agents": self.agent_telemetry,
+            "recent_calls": self.call_history[-10:]
+        }
 
     async def generate_structured(
         self,
@@ -148,12 +200,28 @@ class QwenClient:
         user_prompt: str,
         schema: Type[T],
         max_retries: int = 2,
-        temperature: float = 0.2
+        temperature: Optional[float] = None,
+        agent_id: str = "agent-unknown",
+        role_hint: Optional[str] = None
     ) -> T:
         """
         Request JSON generation conforming to Pydantic schema with bounded retries.
-        Protects GPU via async semaphore.
+        Protects GPU via async semaphore. Tracks token throughput (tokens/sec) and failures per agent.
         """
+        # Determine temperature by role domain (0.2 for code, 0.6 for copywriting/integration)
+        if temperature is None:
+            if role_hint in ("content", "coordinator", "copywriting"):
+                temperature = self.config.copy_temperature
+            else:
+                temperature = self.config.code_temperature
+
+        # Ensure agent telemetry structure exists
+        if agent_id not in self.agent_telemetry:
+            self.agent_telemetry[agent_id] = {
+                "total_calls": 0, "success_calls": 0, "failed_calls": 0,
+                "total_eval_tokens": 0, "total_eval_duration_sec": 0.0, "avg_tokens_per_sec": 0.0
+            }
+
         async with get_gpu_semaphore():
             current_prompt = user_prompt
             template_str = get_schema_template(schema)
@@ -176,8 +244,8 @@ class QwenClient:
                     "format": "json",
                     "options": {
                         "temperature": temperature,
-                        "num_predict": 2048,
-                        "num_ctx": 8192
+                        "num_predict": self.config.num_predict,
+                        "num_ctx": self.config.num_ctx
                     }
                 }
 
@@ -191,7 +259,14 @@ class QwenClient:
                     )
                     res.raise_for_status()
                     latency = round(time.time() - t0, 2)
-                    raw_text = res.json().get("response", "").strip()
+                    res_json = res.json()
+                    raw_text = res_json.get("response", "").strip()
+
+                    # Extract Ollama tokens and eval metrics
+                    eval_count = res_json.get("eval_count", 0)
+                    eval_duration_ns = res_json.get("eval_duration", 0)
+                    eval_sec = (eval_duration_ns / 1e9) if eval_duration_ns > 0 else latency
+                    tokens_per_sec = round(eval_count / eval_sec, 2) if eval_sec > 0 and eval_count > 0 else 0.0
 
                     # Strip any accidental wrapping fences
                     import re
@@ -209,12 +284,47 @@ class QwenClient:
                             raise decode_err
 
                     validated_obj = schema(**parsed_json)
-                    logger.info(f"LLM call succeeded on attempt {attempt+1} in {latency}s")
+
+                    # Update agent telemetry on success
+                    m = self.agent_telemetry[agent_id]
+                    m["total_calls"] += 1
+                    m["success_calls"] += 1
+                    m["total_eval_tokens"] += eval_count
+                    m["total_eval_duration_sec"] += eval_sec
+                    if m["total_eval_duration_sec"] > 0:
+                        m["avg_tokens_per_sec"] = round(m["total_eval_tokens"] / m["total_eval_duration_sec"], 2)
+
+                    self.call_history.append({
+                        "agent_id": agent_id,
+                        "role_hint": role_hint,
+                        "model": self.model,
+                        "latency": latency,
+                        "eval_tokens": eval_count,
+                        "tokens_per_sec": tokens_per_sec,
+                        "status": "success",
+                        "attempt": attempt + 1
+                    })
+
+                    logger.info(
+                        f"LLM call succeeded for '{agent_id}' on attempt {attempt+1} in {latency}s "
+                        f"({tokens_per_sec} tokens/sec, {eval_count} tokens, temp={temperature})"
+                    )
                     return validated_obj
 
                 except (json.JSONDecodeError, Exception) as e:
-                    logger.warning(f"Attempt {attempt+1} failed schema validation: {e}")
+                    logger.warning(f"Attempt {attempt+1} for '{agent_id}' failed validation: {e}")
                     if attempt == max_retries:
+                        self.agent_telemetry[agent_id]["total_calls"] += 1
+                        self.agent_telemetry[agent_id]["failed_calls"] += 1
+                        self.call_history.append({
+                            "agent_id": agent_id,
+                            "role_hint": role_hint,
+                            "model": self.model,
+                            "latency": round(time.time() - t0, 2),
+                            "status": "failed",
+                            "error": str(e),
+                            "attempts": max_retries + 1
+                        })
                         raise ValueError(f"Failed to produce valid JSON after {max_retries+1} attempts: {e}")
                     
                     # Feed back error to model for retry
