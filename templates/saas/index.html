@@ -1,0 +1,137 @@
+<section id="hero" class="section hero">
+  <div class="container hero-content">
+    <span class="badge badge-primary">Next-Gen Platform</span>
+    <h1 class="hero-title">{{ brand_name }}</h1>
+    <p class="hero-tagline">{{ tagline or "Accelerate your digital workflow with autonomous intelligence, real-time analytics, and instant scaling." }}</p>
+    <div class="hero-actions">
+      <a href="#pricing" class="btn btn-primary">Start 14-Day Free Trial</a>
+      <a href="#features" class="btn btn-outline">Explore Features</a>
+    </div>
+  </div>
+</section>
+
+<section id="stats" class="section" style="padding-top: 1rem; padding-bottom: 2rem;">
+  <div class="container">
+    <div class="stats">
+      <div class="card stat-item">
+        <div class="stat-number">99.99%</div>
+        <div class="stat-label">Uptime SLA</div>
+      </div>
+      <div class="card stat-item">
+        <div class="stat-number">10x</div>
+        <div class="stat-label">Faster Deployment</div>
+      </div>
+      <div class="card stat-item">
+        <div class="stat-number">250K+</div>
+        <div class="stat-label">Active Developers</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <div class="container">
+    <div class="section-header">
+      <span class="badge badge-accent">Engineered For Scale</span>
+      <h2 class="section-title">Built for High-Velocity Teams</h2>
+      <p class="section-subtitle">Every tool you need to build, test, and ship high-performance software without infrastructure friction.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3 class="card-title">Real-Time Sync</h3>
+        <p class="card-text">Sub-millisecond data replication across edge regions with deterministic conflict resolution.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <h3 class="card-title">Enterprise Security</h3>
+        <p class="card-text">SOC2 Type II compliant, end-to-end encrypted in transit and at rest with automated audit trails.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3 class="card-title">Automated Telemetry</h3>
+        <p class="card-text">AI-driven anomaly detection and distributed tracing out of the box with zero custom instrumentation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing" class="section">
+  <div class="container">
+    <div class="section-header">
+      <span class="badge badge-primary">Transparent Pricing</span>
+      <h2 class="section-title">Predictable Plans for Every Stage</h2>
+      <p class="section-subtitle">Choose the plan that fits your growth. Upgrade, downgrade, or cancel anytime.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card pricing-card">
+        <h3 class="card-title">Starter</h3>
+        <p class="card-text">For solo creators and side projects.</p>
+        <div class="pricing-price">$19<span style="font-size: 1rem; color: var(--text-secondary);">/mo</span></div>
+        <ul class="pricing-features">
+          <li class="pricing-feature-item">✓ Up to 5 Team Members</li>
+          <li class="pricing-feature-item">✓ 100GB Fast Storage</li>
+          <li class="pricing-feature-item">✓ Community Support</li>
+        </ul>
+        <a href="#contact" class="btn btn-outline" style="width: 100%;">Get Started</a>
+      </div>
+      <div class="card pricing-card pricing-featured">
+        <span class="badge badge-accent">Most Popular</span>
+        <h3 class="card-title">Professional</h3>
+        <p class="card-text">For growing startups and product teams.</p>
+        <div class="pricing-price">$79<span style="font-size: 1rem; color: var(--text-secondary);">/mo</span></div>
+        <ul class="pricing-features">
+          <li class="pricing-feature-item">✓ Unlimited Members</li>
+          <li class="pricing-feature-item">✓ 1TB Fast Storage</li>
+          <li class="pricing-feature-item">✓ 24/7 Priority SLA Support</li>
+          <li class="pricing-feature-item">✓ Custom Domain & SSO</li>
+        </ul>
+        <a href="#contact" class="btn btn-primary" style="width: 100%;">Start Free Trial</a>
+      </div>
+      <div class="card pricing-card">
+        <h3 class="card-title">Enterprise</h3>
+        <p class="card-text">For large-scale security and compliance.</p>
+        <div class="pricing-price">$249<span style="font-size: 1rem; color: var(--text-secondary);">/mo</span></div>
+        <ul class="pricing-features">
+          <li class="pricing-feature-item">✓ Dedicated Edge Clusters</li>
+          <li class="pricing-feature-item">✓ Custom SLA Guarantee</li>
+          <li class="pricing-feature-item">✓ Dedicated Success Manager</li>
+        </ul>
+        <a href="#contact" class="btn btn-outline" style="width: 100%;">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact" class="section">
+  <div class="container">
+    <div class="section-header">
+      <span class="badge badge-accent">Get In Touch</span>
+      <h2 class="section-title">Schedule an Architecture Review</h2>
+      <p class="section-subtitle">Have questions or need enterprise onboarding? Our engineering architects are here to help.</p>
+    </div>
+    <div class="card" style="max-width: 640px; margin: 0 auto;">
+      <form class="form" id="contact-form">
+        <div class="grid grid-2">
+          <div class="form-group">
+            <label for="work-email" class="form-label">Work Email</label>
+            <input type="email" id="work-email" name="email" class="form-input" placeholder="alex@company.com" required>
+          </div>
+          <div class="form-group">
+            <label for="team-size" class="form-label">Team Size</label>
+            <select id="team-size" name="team_size" class="form-input">
+              <option value="1-10">1 - 10 people</option>
+              <option value="11-50">11 - 50 people</option>
+              <option value="50+">50+ people</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="message" class="form-label">Project Objectives</label>
+          <textarea id="message" name="message" class="form-textarea" placeholder="Tell us about your tech stack and requirements..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Inquiry</button>
+      </form>
+    </div>
+  </div>
+</section>

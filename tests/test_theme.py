@@ -152,3 +152,4 @@ def test_qa_html_classes_compliance():
     defects_rogue = audit_html_classes(rogue_html, "index.html")
     assert len(defects_rogue) == 1
     assert "rogue-mystery-wrapper-xyz" in defects_rogue[0].summary
+

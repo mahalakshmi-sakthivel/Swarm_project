@@ -1,0 +1,66 @@
+<section id="hero" class="section hero">
+  <div class="container hero-content">
+    <span class="badge badge-primary">Essays & Insights</span>
+    <h1 class="hero-title">{{ brand_name }}</h1>
+    <p class="hero-tagline">{{ tagline or "Thoughtful perspectives on design systems, autonomous AI architectures, and modern web craft." }}</p>
+    <div class="hero-actions">
+      <a href="#featured" class="btn btn-primary">Read Featured Article</a>
+      <a href="#newsletter" class="btn btn-outline">Subscribe</a>
+    </div>
+  </div>
+</section>
+
+<section id="featured" class="section">
+  <div class="container">
+    <div class="section-header">
+      <span class="badge badge-accent">Editor's Pick</span>
+      <h2 class="section-title">Latest Dispatches</h2>
+      <p class="section-subtitle">Deep explorations of technical breakthroughs and design philosophies.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card">
+        <span class="badge badge-primary">Architecture</span>
+        <h3 class="card-title">Building Multi-Agent Swarms with SQLite WAL</h3>
+        <p class="card-text">How decentralized stigmergic coordination outperforms monolithic LLM pipelines by separating intent from execution.</p>
+        <div class="card-footer" style="display: flex; justify-content: space-between;">
+          <small>May 12, 2026</small>
+          <small>8 min read</small>
+        </div>
+      </div>
+      <div class="card">
+        <span class="badge badge-accent">Design Systems</span>
+        <h3 class="card-title">Deterministic Themes vs. Hallucinated CSS</h3>
+        <p class="card-text">Why moving CSS variable generation into Python yields 100% accessible contrast and zero visual jitter.</p>
+        <div class="card-footer" style="display: flex; justify-content: space-between;">
+          <small>Apr 28, 2026</small>
+          <small>6 min read</small>
+        </div>
+      </div>
+      <div class="card">
+        <span class="badge badge-primary">Performance</span>
+        <h3 class="card-title">Micro-Interactions Without the Framework Bloat</h3>
+        <p class="card-text">Crafting fluid 60fps animations with pure CSS custom properties and zero client-side hydration delays.</p>
+        <div class="card-footer" style="display: flex; justify-content: space-between;">
+          <small>Apr 14, 2026</small>
+          <small>5 min read</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="newsletter" class="section">
+  <div class="container">
+    <div class="card" style="max-width: 600px; margin: 0 auto; text-align: center;">
+      <span class="badge badge-primary">Stay In The Loop</span>
+      <h2 class="card-title">Join 15,000+ Readers</h2>
+      <p class="card-text">Get our bi-weekly dispatch delivered straight to your inbox. No spam, ever.</p>
+      <form class="form" id="newsletter-form" style="margin-top: 1.5rem;">
+        <div class="grid grid-2">
+          <input type="email" id="news-email" class="form-input" placeholder="you@domain.com" required>
+          <button type="submit" class="btn btn-primary">Subscribe</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

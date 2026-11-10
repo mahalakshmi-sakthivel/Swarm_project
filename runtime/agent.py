@@ -488,7 +488,33 @@ class SwarmAgent:
 
         # Supply generated HTML pages and base design system context to style and script agents
         context_files = ""
-        if target_file in ("styles.css", "script.js"):
+        few_shot_block = ""
+        starter_template_block = ""
+
+        if target_file.endswith(".html") and self.sandbox.file_exists("spec.json"):
+            from runtime.templates import get_few_shot_example, load_starter_template, fill_template_placeholders
+            import json
+            try:
+                spec_raw = json.loads(self.sandbox.read_file("spec.json"))
+                spec_obj = SiteSpec(**spec_raw)
+                matching_page = next((p for p in spec_obj.pages if p.file == target_file), None)
+                if not matching_page:
+                    matching_page = PageSpec(id="page", file=target_file, title="Page", sections=[])
+
+                few_shot_block = f"\nFEW-SHOT HIGH QUALITY <main> EXAMPLE (for site_type '{spec_obj.site_type}'):\n```html\n{get_few_shot_example(spec_obj.site_type)}\n```\n"
+
+                raw_template = load_starter_template(spec_obj.site_type, target_file)
+                if raw_template:
+                    hydrated_template = fill_template_placeholders(raw_template, spec_obj, matching_page)
+                    starter_template_block = (
+                        f"\nHAND-CRAFTED STARTER TEMPLATE (Adapt this layout to satisfy the prompt's requirements):\n"
+                        f"```html\n{hydrated_template}\n```\n"
+                        f"Fill in realistic content matching the brand tone, retain standard component classes (.container, .section, .hero, .grid, .card, .btn), and satisfy all user requirements.\n"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed loading template context: {e}")
+
+        elif target_file in ("styles.css", "script.js"):
             html_snippets = []
             for f in self.sandbox.list_files():
                 if f.endswith(".html"):
@@ -514,6 +540,8 @@ Description: {target_task.description}
 Target File: {target_file}
 Existing files in workspace: {existing_files}
 {current_content}
+{few_shot_block}
+{starter_template_block}
 {context_files}
 
 Decide your action:
@@ -533,15 +561,21 @@ Decide your action:
                 file_path = action_data.args.get("path", target_task.target or "index.html")
                 file_content = action_data.args.get("content", "")
 
-                # Deterministic HTML Page Assembly via Jinja2 (Phase 2)
+                # Deterministic HTML Page Assembly via Jinja2 (Phase 2 & 4)
                 if file_path.endswith(".html") and self.sandbox.file_exists("spec.json"):
                     from runtime.render import render_full_page
+                    from runtime.templates import load_starter_template, fill_template_placeholders
                     import json
                     try:
                         spec_raw = json.loads(self.sandbox.read_file("spec.json"))
                         spec_obj = SiteSpec(**spec_raw)
                         matching_page = next((p for p in spec_obj.pages if p.file == file_path), None)
                         if matching_page:
+                            # Fall back to hydrated starter template if LLM output is empty or whitespace
+                            if not file_content.strip():
+                                tmpl = load_starter_template(spec_obj.site_type, file_path)
+                                if tmpl:
+                                    file_content = fill_template_placeholders(tmpl, spec_obj, matching_page)
                             file_content = render_full_page(spec_obj, matching_page, file_content)
                     except Exception as err:
                         logger.warning(f"Error compiling deterministic page HTML for '{file_path}': {err}")

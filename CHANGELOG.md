@@ -2,6 +2,28 @@
 
 All notable changes to the Swarm Website Builder project will be documented in this file.
 
+## [Phase 4: Templates per Site Type & Few-Shot Prompts] - 2026-11-10
+### Added
+- Curated `/templates` directory with hand-crafted starter layout templates across all primary site types:
+  - `templates/restaurant/`: `index.html` (hero, seasonal specials grid, culinary philosophy), `menu.html` (appetizers, wood-fired mains, pricing), `about.html` (kitchen craft, chef quote, interactive reservation form).
+  - `templates/saas/`: `index.html` (platform hero, live stats counter bar, grid-3 feature showcase, 3-tier pricing matrix, architecture review inquiry form).
+  - `templates/portfolio/`: `index.html` (design & engineering intro hero, selected project cards with tags, skills grid, contact form), `work.html` (detailed case study cards with measurable metrics).
+  - `templates/store/`: `index.html` (promo banner hero, curated trending products grid with prices and 'Add to Bag' actions, carbon-neutral trust badges).
+  - `templates/blog/`: `index.html` (thoughtful essays hero, editor's pick 3-column articles grid with reading times, newsletter signup).
+  - `templates/landing/`: `index.html` (high-conversion hero, 3-step workflow grid, client testimonials, early access waitlist form).
+- `runtime/templates.py`:
+  - `load_starter_template(site_type, page_file)`: Resolves and loads starter layouts from `/templates`.
+  - `fill_template_placeholders(raw, spec, page)`: Deterministically hydrates brand name, taglines, and section titles into starter markup.
+  - `FEW_SHOT_EXAMPLES`: Domain-tailored, few-shot inner `<main>` section blocks demonstrating clean component hierarchy, accessible classes, and realistic domain copy.
+- `tests/test_templates.py`: 15 comprehensive unit tests verifying template loading across all site types, multi-page template resolution, placeholder hydration, few-shot validity, and 100% compliance of all templates with `base.css` component classes.
+
+### Changed
+- `runtime/agent.py`:
+  - Injected domain-specific few-shot examples and hydrated starter template layouts directly into the Structure Specialist prompt.
+  - Added deterministic fallback: if a small 4B LLM produces empty or truncated markup, the agent automatically falls back to the hydrated starter template rather than writing an empty file.
+
+---
+
 ## [Phase 3: Deterministic Theme System & Component Library] - 2026-11-10
 ### Added
 - `runtime/theme.py`:
