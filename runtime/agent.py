@@ -87,11 +87,10 @@ class SwarmAgent:
                 "id": "task-01-structure",
                 "title": f"HTML5 Structure for '{prompt_snippet}'",
                 "description": (
-                    f"Create a complete, rich semantic HTML5 document in index.html tailored precisely to the user's requirements: '{prompt}'. "
-                    f"Follow spec.json strictly for brand_name, sections, and class names. "
-                    f"Design meaningful sections, headers, cards, data displays, interactive forms, or widgets directly reflecting the prompt requirements. "
-                    f"Include a responsive navigation bar, a compelling hero/header section, rich content sections specific to the website type, and a footer. "
-                    f"Link styles.css in <head> and script.js with defer. Ensure all elements have clear semantic class names and IDs."
+                    f"Create semantic inner <main> section content for index.html strictly following spec.json. "
+                    f"Use ONLY standard design system component classes from base.css (.container, .section, .hero, .grid, .card, "
+                    f".btn-primary, .btn-outline, .btn-accent, .badge, .form, .testimonial, .pricing, .gallery, .faq, .stats). "
+                    f"Do NOT invent custom class names. <head>, <nav>, and <footer> are automatically rendered in Python."
                 ),
                 "role_hint": "structure",
                 "priority": 5,
@@ -100,16 +99,12 @@ class SwarmAgent:
             },
             {
                 "id": "task-02-styling",
-                "title": "Design System & Responsive Styles (styles.css)",
+                "title": "Page-Specific Styles & Visual Polish (styles.css)",
                 "description": (
-                    f"Design a complete, vibrant CSS design system in styles.css strictly adhering to the theme and requirements in: '{prompt}'. "
-                    f"Follow spec.json strictly for color tokens, mood, radius, and typography. "
-                    f"Define cohesive CSS custom properties in :root (--bg-primary, --bg-secondary, --bg-card, --text-primary, --text-secondary, "
-                    f"--accent-primary, --accent-secondary, --accent-gradient, --border, --shadow-lg). "
-                    f"NEVER use dull gray or plain monochrome for accents. Implement badges/pills (.badge, .tag), "
-                    f"interactive cards with smooth hover elevation and shadow (.card, .feature-card), vibrant primary buttons with hover glow (.btn-primary), "
-                    f"outline secondary buttons (.btn-secondary), form focus rings, and alternating section contrast. Include responsive @media rules for mobile. "
-                    f"CRITICAL: Output 100% full functional CSS. Never output comments-only, stubs, or placeholders."
+                    f"Write page-specific CSS extras, micro-animations, hero gradients, and card transitions in styles.css. "
+                    f"base.css is ALREADY PROVIDED with :root variables and complete component library. "
+                    f"DO NOT redefine :root variables and DO NOT duplicate base styles. "
+                    f"DO NOT hard-code hex colors; always use theme CSS variables: var(--primary), var(--secondary), var(--accent), var(--bg-surface), etc."
                 ),
                 "role_hint": "style",
                 "priority": 4,
@@ -403,6 +398,24 @@ class SwarmAgent:
                 payload={"bytes": write_res["bytes"], "summary": f"Synthesized SiteSpec for {spec.brand_name} ({spec.site_type})"}
             )
 
+            # Generate and record deterministic base.css component library (Phase 3)
+            from runtime.theme import generate_base_css
+            base_css_content = generate_base_css(spec.theme)
+            base_res = self.sandbox.write_file("base.css", base_css_content)
+            self.blackboard.record_artifact(
+                run_id=self.run_id,
+                path="base.css",
+                content_hash=base_res["content_hash"],
+                author_agent=self.agent_id
+            )
+            self.event_log.append(
+                run_id=self.run_id,
+                agent_id=self.agent_id,
+                event_type="file_edit",
+                target="base.css",
+                payload={"bytes": base_res["bytes"], "summary": f"Generated base.css ({spec.theme.mood} theme) with complete component library"}
+            )
+
             # Dynamically seed structure tasks for all pages in spec.pages
             structure_task_ids = []
             for idx, p in enumerate(spec.pages):
@@ -414,7 +427,8 @@ class SwarmAgent:
                     title=f"Page Layout: {p.title} ({p.file})",
                     description=(
                         f"Generate inner <main> content for page '{p.title}' ({p.file}). "
-                        f"Sections: {sec_list}. Follow spec.json strictly."
+                        f"Sections: {sec_list}. Follow spec.json strictly. "
+                        f"Use ONLY standard component classes from base.css (.container, .section, .hero, .grid, .card, .btn-primary, .btn-outline, .badge, .form, .testimonial, .pricing, .gallery, .faq, .stats)."
                     ),
                     role_hint="structure",
                     status="open",
@@ -429,6 +443,11 @@ class SwarmAgent:
             style_task = self.blackboard.get_task(self.run_id, "task-02-styling")
             if style_task:
                 style_task.depends_on = ["task-00-plan"] + structure_task_ids
+                style_task.description = (
+                    "Write page-specific extras, animations, or accents in styles.css. "
+                    "base.css is ALREADY PROVIDED with :root variables and full component library. "
+                    "DO NOT redefine :root variables or duplicate base.css. DO NOT hardcode colors; use var(--...)."
+                )
                 self.blackboard.add_task(style_task)
 
             script_task = self.blackboard.get_task(self.run_id, "task-03-script")
@@ -467,9 +486,22 @@ class SwarmAgent:
         if self.sandbox.file_exists("spec.json"):
             spec_contract = f"\nSHARED SITE SPECIFICATION CONTRACT (spec.json - STRICTLY FOLLOW THIS):\n```json\n{self.sandbox.read_file('spec.json')}\n```\n"
 
-        # Also supply index.html context to style and script agents so they match DOM selectors
+        # Supply generated HTML pages and base design system context to style and script agents
         context_files = ""
-        if target_file != "index.html" and self.sandbox.file_exists("index.html"):
+        if target_file in ("styles.css", "script.js"):
+            html_snippets = []
+            for f in self.sandbox.list_files():
+                if f.endswith(".html"):
+                    html_snippets.append(f"--- {f} ---\n{self.sandbox.read_file(f)}")
+            if html_snippets:
+                context_files = f"\nGENERATED HTML MARKUP (match your code to these actual IDs and classes):\n```\n" + "\n\n".join(html_snippets) + "\n```\n"
+            if target_file == "styles.css" and self.sandbox.file_exists("base.css"):
+                context_files += (
+                    f"\nNOTE: base.css is already active and provides :root variables and all base component styles.\n"
+                    f"Write only page-specific overrides, animations, and accents in styles.css.\n"
+                    f"DO NOT duplicate :root or use hard-coded colors; always use var(--...).\n"
+                )
+        elif target_file != "index.html" and self.sandbox.file_exists("index.html"):
             context_files = f"\nReference 'index.html' (match your selectors to this markup):\n```\n{self.sandbox.read_file('index.html')}\n```\n"
 
         user_prompt = f"""

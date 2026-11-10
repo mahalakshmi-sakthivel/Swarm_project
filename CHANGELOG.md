@@ -2,6 +2,31 @@
 
 All notable changes to the Swarm Website Builder project will be documented in this file.
 
+## [Phase 3: Deterministic Theme System & Component Library] - 2026-11-10
+### Added
+- `runtime/theme.py`:
+  - `generate_root_css(theme: ThemeSpec)`: Deterministic synthesizer for CSS custom properties in `:root` (primary, secondary, accent, surface, border, radius scale, layered box-shadows, and spacing scale).
+  - `generate_base_css(theme: ThemeSpec)`: Hand-crafted, responsive component library covering `.container`, `.section`, `.section-header`, `.hero`, `.grid`, `.grid-2`, `.grid-3`, `.grid-4`, `.card`, `.btn`, `.btn-primary`, `.btn-outline`, `.btn-accent`, `.badge`, `.form`, `.testimonial`, `.pricing`, `.gallery`, `.faq`, `.stats`, `.navbar`, and `.site-footer`.
+  - Accessible focus states (`:focus-visible`), fluid clamp typography, and responsive mobile breakpoints (`@media (max-width: 768px)`).
+  - `get_google_fonts_link(font_heading, font_body)`: Generates Google Fonts preconnect and stylesheet link tags.
+  - `ALLOWED_COMPONENT_CLASSES`: Strict contract whitelist of standard design system classes for structure and styling agents.
+- `tests/test_theme.py`: 5 comprehensive unit tests verifying `:root` variable extraction, component class coverage, brace balance, Google Fonts parsing, and QA color/class compliance.
+- `runtime/qa.py` extensions:
+  - `audit_theme_colors()`: Flags hardcoded hex colors outside `:root` to enforce variable reuse.
+  - `audit_html_classes()`: Validates that all classes used in HTML markup adhere to the design system component whitelist.
+  - Verification of `base.css` presence, `:root` definitions, and balanced braces.
+
+### Changed
+- `runtime/render.py`: Automatically links both `<link rel="stylesheet" href="base.css">` and `<link rel="stylesheet" href="styles.css">` alongside dynamic Google Fonts links in `<head>`.
+- `runtime/roles.py`:
+  - Updated `ROLE_STRUCTURE` system prompt to mandate the use of ONLY the standard component classes.
+  - Updated `ROLE_STYLE` system prompt to extend `base.css` without redefining `:root` or hard-coding colors.
+- `runtime/agent.py`:
+  - `task-00-plan` automatically generates and commits `base.css` to the sandbox and blackboard before layout begins.
+  - `task-02-styling` provides full multi-page HTML context and `base.css` design system guidelines to the Style Specialist.
+
+---
+
 ## [Phase 2: Multi-Page Output & Deterministic Navigation] - 2026-11-10
 ### Added
 - `runtime/render.py`: Deterministic Jinja2 page assembly engine:

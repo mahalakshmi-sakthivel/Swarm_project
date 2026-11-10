@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import re
 from typing import Any, Dict, List, Optional
 from runtime.sandbox import Sandbox
+from runtime.theme import ALLOWED_COMPONENT_CLASSES_SET
 
 
 @dataclass
@@ -134,36 +135,89 @@ def audit_links(content: str, current_file: str, sandbox: Sandbox) -> List[QADef
     return defects
 
 
-def audit_css(content: str) -> List[QADefect]:
+def audit_html_classes(content: str, current_file: str) -> List[QADefect]:
+    """Check that classes used in HTML belong to base.css design system or structural patterns."""
+    defects = []
+    class_attrs = re.findall(r'class=[\'"]([^\'"]+)[\'"]', content)
+    for class_str in class_attrs:
+        classes = class_str.strip().split()
+        for cls in classes:
+            cls_clean = cls.strip()
+            if not cls_clean:
+                continue
+            # Allow defined component classes and standard dynamic/framework patterns
+            if (
+                cls_clean in ALLOWED_COMPONENT_CLASSES_SET
+                or cls_clean.startswith(("page-", "theme-", "icon-", "sec-"))
+                or cls_clean in (
+                    "active", "open", "visible", "hidden", "disabled", "short",
+                    "brand-logo", "logo-text", "site-header", "page-main",
+                    "footer-logo", "footer-tagline", "footer-nav", "footer-info",
+                    "footer-audience", "footer-tone", "footer-bottom", "copyright",
+                    "hamburger-bar", "mobile-menu-btn", "nav-actions"
+                )
+            ):
+                continue
+            defects.append(QADefect(
+                target=current_file,
+                role_hint="structure",
+                severity="low",
+                summary=f"Unrecognized class '{cls_clean}' in {current_file}",
+                remediation=f"Use standard design system component classes from base.css instead of '{cls_clean}'"
+            ))
+    return defects
+
+
+def audit_theme_colors(css_content: str, target_file: str = "styles.css") -> List[QADefect]:
+    """Verify that CSS does not use hardcoded hex colors outside :root."""
+    defects = []
+    clean_css = re.sub(r'/\*[\s\S]*?\*/', '', css_content)
+    # Exclude :root block from check
+    non_root_css = re.sub(r':root\s*\{[\s\S]*?\}', '', clean_css)
+    
+    hex_matches = re.findall(r'#(?:[0-9a-fA-F]{3,8})\b', non_root_css)
+    unique_hexes = list(set(hex_matches))
+    for h in unique_hexes[:3]:
+        defects.append(QADefect(
+            target=target_file,
+            role_hint="style",
+            severity="medium",
+            summary=f"Hardcoded hex color '{h}' found in {target_file}",
+            remediation=f"Replace '{h}' with theme CSS variables: var(--primary), var(--accent), var(--bg-surface), etc."
+        ))
+    return defects
+
+
+def audit_css(content: str, target_file: str = "styles.css", is_base: bool = False) -> List[QADefect]:
     defects = []
 
     clean_content = content.strip()
 
     if len(clean_content) < 15:
         defects.append(QADefect(
-            target="styles.css",
+            target=target_file,
             role_hint="style",
             severity="critical",
-            summary=f"styles.css is too short ({len(clean_content)} bytes) or empty",
-            remediation="Generate a complete styles.css stylesheet with styling for all HTML classes"
+            summary=f"{target_file} is too short ({len(clean_content)} bytes) or empty",
+            remediation=f"Generate a functional stylesheet in {target_file}"
         ))
 
     if clean_content.startswith("<!--") or ("/* CSS" in clean_content and len(clean_content) < 120):
         defects.append(QADefect(
-            target="styles.css",
+            target=target_file,
             role_hint="style",
             severity="critical",
-            summary="styles.css contains placeholder comment stubs instead of functional CSS rules",
+            summary=f"{target_file} contains placeholder comment stubs instead of functional CSS rules",
             remediation="Provide complete CSS declarations for all navigation, hero, card, and footer classes"
         ))
 
     if "<!DOCTYPE" in content.upper() or "<HTML" in content.upper() or "<STYLE" in content.upper():
         defects.append(QADefect(
-            target="styles.css",
+            target=target_file,
             role_hint="style",
             severity="critical",
-            summary="styles.css contains HTML markup instead of CSS rules",
-            remediation="styles.css must contain only pure CSS stylesheet rules, not HTML tags"
+            summary=f"{target_file} contains HTML markup instead of CSS rules",
+            remediation=f"{target_file} must contain only pure CSS stylesheet rules, not HTML tags"
         ))
 
     open_braces = content.count("{")
@@ -171,39 +225,40 @@ def audit_css(content: str) -> List[QADefect]:
 
     if open_braces != close_braces:
         defects.append(QADefect(
-            target="styles.css",
+            target=target_file,
             role_hint="style",
             severity="critical",
-            summary=f"Unbalanced CSS braces ({open_braces} open vs {close_braces} close)",
-            remediation="Fix mismatched curly braces in styles.css"
+            summary=f"Unbalanced CSS braces in {target_file} ({open_braces} open vs {close_braces} close)",
+            remediation=f"Fix mismatched curly braces in {target_file}"
         ))
 
     if open_braces == 0:
         defects.append(QADefect(
-            target="styles.css",
+            target=target_file,
             role_hint="style",
             severity="critical",
-            summary="styles.css lacks rule blocks (no '{' braces found)",
-            remediation="Implement styling rule blocks for HTML elements and classes"
+            summary=f"{target_file} lacks rule blocks (no '{{' braces found)",
+            remediation=f"Implement styling rule blocks for HTML elements and classes in {target_file}"
         ))
 
-    if ":root" not in content and "--" not in content:
-        defects.append(QADefect(
-            target="styles.css",
-            role_hint="style",
-            severity="low",
-            summary="No CSS custom variables detected",
-            remediation="Define theme variables in a :root block (e.g., --bg-primary, --text-primary)"
-        ))
+    if is_base:
+        if ":root" not in content and "--" not in content:
+            defects.append(QADefect(
+                target=target_file,
+                role_hint="style",
+                severity="high",
+                summary=f"Missing :root block in {target_file}",
+                remediation="Define theme variables in a :root block (e.g., --bg-primary, --text-primary)"
+            ))
 
-    if "@media" not in content:
-        defects.append(QADefect(
-            target="styles.css",
-            role_hint="style",
-            severity="medium",
-            summary="No media queries detected for responsive design",
-            remediation="Add responsive breakpoints like @media (max-width: 768px)"
-        ))
+        if "@media" not in content:
+            defects.append(QADefect(
+                target=target_file,
+                role_hint="style",
+                severity="medium",
+                summary=f"No media queries detected in {target_file} for responsive design",
+                remediation="Add responsive breakpoints like @media (max-width: 768px)"
+            ))
 
     return defects
 
@@ -305,9 +360,34 @@ def run_qa_audit(sandbox: Sandbox) -> QAAuditReport:
             else:
                 defects.extend(link_def)
 
+            # Audit design system component classes compliance (Phase 3)
+            class_def = audit_html_classes(page_content, current_file=page_file)
+            if not class_def:
+                checks_passed.append(f"Component classes in {page_file} comply with design system")
+            else:
+                defects.extend(class_def)
+
     # 3. Check CSS & JS existence
+    base_exists = sandbox.file_exists("base.css")
     css_exists = sandbox.file_exists("styles.css")
     js_exists = sandbox.file_exists("script.js")
+
+    if base_exists:
+        checks_passed.append("File base.css exists")
+        base_content = sandbox.read_file("base.css")
+        base_def = audit_css(base_content, target_file="base.css", is_base=True)
+        if not base_def:
+            checks_passed.append("base.css design system & theme variables valid")
+        else:
+            defects.extend(base_def)
+    elif sandbox.file_exists("spec.json"):
+        defects.append(QADefect(
+            target="base.css",
+            role_hint="style",
+            severity="high",
+            summary="base.css component library is missing in sandbox",
+            remediation="Generate base.css from spec.theme using generate_base_css()"
+        ))
 
     if not css_exists:
         defects.append(QADefect(
@@ -320,11 +400,18 @@ def run_qa_audit(sandbox: Sandbox) -> QAAuditReport:
     else:
         checks_passed.append("File styles.css exists")
         css_content = sandbox.read_file("styles.css")
-        css_def = audit_css(css_content)
+        css_def = audit_css(css_content, target_file="styles.css", is_base=not base_exists)
         if not css_def:
-            checks_passed.append("CSS syntax and responsive rules valid")
+            checks_passed.append("CSS syntax and rules valid")
         else:
             defects.extend(css_def)
+
+        # Check theme color compliance (no hardcoded colors outside :root)
+        color_def = audit_theme_colors(css_content, target_file="styles.css")
+        if not color_def:
+            checks_passed.append("styles.css conforms to theme variable palette")
+        else:
+            defects.extend(color_def)
 
     if not js_exists:
         defects.append(QADefect(

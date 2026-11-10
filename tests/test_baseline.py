@@ -125,13 +125,15 @@ def test_phase2_multi_page_navigation_passes(tmp_path):
     """Verify that when all pages in spec.pages are properly generated, QA passes with 0 broken links."""
     from runtime.render import render_full_page
     from runtime.spec import generate_default_spec
+    from runtime.theme import generate_base_css
 
     run_id = "phase2_verified_run"
     sandbox = Sandbox(run_id=run_id, base_dir=str(tmp_path / ".sandbox"))
 
     spec = generate_default_spec("Modern rustic bakery with 3 pages")
     sandbox.write_file("spec.json", spec.model_dump_json(indent=2))
-    sandbox.write_file("styles.css", ":root { --bg: #fff; --text: #000; }\nbody { color: var(--text); }\n@media(max-width:768px){}")
+    sandbox.write_file("base.css", generate_base_css(spec.theme))
+    sandbox.write_file("styles.css", ".page-intro { margin-bottom: 2rem; color: var(--text-primary); }")
     sandbox.write_file("script.js", "console.log('loaded');")
 
     # Generate each page in spec using render_full_page

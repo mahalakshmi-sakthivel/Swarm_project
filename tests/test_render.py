@@ -33,6 +33,7 @@ def test_render_full_page_multipage():
     assert "<!DOCTYPE html>" in rendered_home
     assert "<meta name=\"viewport\"" in rendered_home
     assert f"<title>{home_page.title}</title>" in rendered_home
+    assert '<link rel="stylesheet" href="base.css">' in rendered_home
     assert '<link rel="stylesheet" href="styles.css">' in rendered_home
     assert '<script src="script.js" defer></script>' in rendered_home
 
@@ -76,3 +77,4 @@ def test_extract_clean_main_content():
     assert "<nav>" not in clean
     assert "<footer>" not in clean
     assert "<!DOCTYPE" not in clean
+

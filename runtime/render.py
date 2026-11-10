@@ -13,6 +13,7 @@ import re
 from typing import Optional
 from jinja2 import Template
 from runtime.spec import PageSpec, SiteSpec
+from runtime.theme import get_google_fonts_link
 
 PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -20,10 +21,8 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ page.title }}</title>
-  {% if spec.theme.font_heading and 'Google' in spec.theme.font_heading %}
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  {% endif %}
+  {{ google_fonts_markup }}
+  <link rel="stylesheet" href="base.css">
   <link rel="stylesheet" href="styles.css">
   <script src="script.js" defer></script>
 </head>
@@ -148,10 +147,13 @@ def render_full_page(spec: SiteSpec, page: PageSpec, raw_main_content: str) -> s
     Renders the complete, fully formed HTML document for a specific page in the SiteSpec.
     """
     clean_main = extract_clean_main_content(raw_main_content)
+    fonts_markup = get_google_fonts_link(spec.theme.font_heading, spec.theme.font_body)
 
     return _compiled_template.render(
         spec=spec,
         page=page,
         pages=spec.pages,
-        main_content=clean_main
+        main_content=clean_main,
+        google_fonts_markup=fonts_markup
     )
+
