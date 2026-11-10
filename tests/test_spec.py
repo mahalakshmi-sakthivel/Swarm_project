@@ -122,3 +122,4 @@ def test_parse_or_repair_spec_fallback():
     assert spec3.tagline == "Customized Tagline"
     assert spec3.theme.primary == "#ff0077"
     assert len(spec3.pages) >= 1  # pages filled from defaults
+

@@ -14,17 +14,33 @@ export default function PreviewPane({
   const [viewport, setViewport] = useState('desktop'); // desktop | tablet | mobile
   const [showCursors, setShowCursors] = useState(false);
   const [hasRenderedIframe, setHasRenderedIframe] = useState(false);
+  const [activePage, setActivePage] = useState('index.html');
   const iframeRef = useRef(null);
   const lastReloadRef = useRef(reloadTrigger);
 
-  const hasIndexHtml = files.includes('index.html');
-  const directSiteUrl = runId ? `/runs/${runId}/preview/index.html` : null;
+  // Discover all HTML pages in sandbox
+  const htmlFiles = files.filter((f) => f.endsWith('.html'));
+  if (htmlFiles.length === 0 && (files.includes('index.html') || hasRenderedIframe)) {
+    htmlFiles.push('index.html');
+  }
+
+  // Ensure activePage points to a valid page if available
+  useEffect(() => {
+    if (htmlFiles.length > 0 && !htmlFiles.includes(activePage)) {
+      setActivePage(htmlFiles.includes('index.html') ? 'index.html' : htmlFiles[0]);
+    }
+  }, [htmlFiles, activePage]);
+
+  const hasIndexHtml = files.includes('index.html') || htmlFiles.length > 0;
+  const currentPreviewUrl = runId ? `/runs/${runId}/preview/${activePage}` : null;
+  const directSiteUrl = currentPreviewUrl;
 
   const activeTask = tasks.find((t) => t.status === 'in_progress') || tasks.find((t) => t.status === 'open');
 
   useEffect(() => {
     // Reset when runId changes
     setHasRenderedIframe(false);
+    setActivePage('index.html');
   }, [runId]);
 
   useEffect(() => {
@@ -33,16 +49,66 @@ export default function PreviewPane({
     }
   }, [hasIndexHtml]);
 
-  // Smooth reload without tearing down or remounting the iframe element
+  // Handle active page switch and smooth reloads
+  useEffect(() => {
+    if (!runId || !iframeRef.current || (!hasIndexHtml && !hasRenderedIframe)) return;
+    const targetSrc = `/runs/${runId}/preview/${activePage}?v=${Date.now()}`;
+    if (iframeRef.current.src !== targetSrc) {
+      iframeRef.current.src = targetSrc;
+    }
+  }, [activePage, runId]);
+
+  // Smooth reload on live file edits
   useEffect(() => {
     if (!runId || (!hasIndexHtml && !hasRenderedIframe)) return;
     if (runStatus === 'converged' || runStatus === 'completed') return;
 
     if (reloadTrigger > lastReloadRef.current && iframeRef.current) {
       lastReloadRef.current = reloadTrigger;
-      iframeRef.current.src = `/runs/${runId}/preview/index.html?v=${Date.now()}`;
+      iframeRef.current.src = `/runs/${runId}/preview/${activePage}?v=${Date.now()}`;
     }
-  }, [reloadTrigger, runId, hasIndexHtml, hasRenderedIframe, runStatus]);
+  }, [reloadTrigger, runId, hasIndexHtml, hasRenderedIframe, runStatus, activePage]);
+
+  // Intercept in-iframe link navigation to switch active page tab seamlessly
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleIframeLoad = () => {
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) return;
+
+        const handleClick = (e) => {
+          const anchor = e.target.closest('a');
+          if (!anchor) return;
+          const href = anchor.getAttribute('href');
+          if (!href) return;
+
+          // Ignore same-page anchors and external protocols
+          if (href.startsWith('#') || href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+            return;
+          }
+
+          // Relative page link
+          const cleanHref = href.split('#')[0].replace(/^\.\//, '');
+          if (cleanHref.endsWith('.html')) {
+            e.preventDefault();
+            setActivePage(cleanHref);
+          }
+        };
+
+        iframeDoc.addEventListener('click', handleClick);
+      } catch (err) {
+        // Cross-origin restriction fallback
+      }
+    };
+
+    iframe.addEventListener('load', handleIframeLoad);
+    return () => {
+      iframe.removeEventListener('load', handleIframeLoad);
+    };
+  }, [runId, activePage]);
 
   const getViewportWidth = () => {
     switch (viewport) {
@@ -173,6 +239,26 @@ export default function PreviewPane({
               <span className="viewport-pill">{viewport.toUpperCase()}</span>
             </div>
           </div>
+
+          {/* Page Tabs Bar (Phase 2 Multi-Page Navigation) */}
+          {runId && htmlFiles.length > 0 && (
+            <div className="browser-page-tabs-bar">
+              <div className="browser-page-tabs-list">
+                {htmlFiles.map((pageFile) => (
+                  <button
+                    key={pageFile}
+                    type="button"
+                    className={`browser-page-tab ${activePage === pageFile ? 'active' : ''}`}
+                    onClick={() => setActivePage(pageFile)}
+                    title={`Switch preview to ${pageFile}`}
+                  >
+                    <span className="page-tab-icon">📄</span>
+                    <span className="page-tab-name">{pageFile}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Browser Window Body: Live Iframe OR Dedicated Blueprint Staging Canvas */}
           {runId && (hasIndexHtml || hasRenderedIframe) ? (

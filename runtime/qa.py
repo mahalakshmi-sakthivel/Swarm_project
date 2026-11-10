@@ -27,62 +27,109 @@ class QAAuditReport:
     checks_passed: List[str] = field(default_factory=list)
 
 
-def audit_html(content: str) -> List[QADefect]:
+def audit_html(content: str, target_file: str = "index.html") -> List[QADefect]:
     defects = []
 
     if "<!DOCTYPE HTML>" not in content.upper():
         defects.append(QADefect(
-            target="index.html",
+            target=target_file,
             role_hint="structure",
             severity="critical",
-            summary="Missing <!DOCTYPE html> declaration",
-            remediation="Add <!DOCTYPE html> as the very first line of index.html"
+            summary=f"Missing <!DOCTYPE html> declaration in {target_file}",
+            remediation=f"Add <!DOCTYPE html> as the very first line of {target_file}"
         ))
 
     if "<html" not in content or "</html>" not in content:
         defects.append(QADefect(
-            target="index.html",
+            target=target_file,
             role_hint="structure",
             severity="critical",
-            summary="Missing <html> or </html> tags",
+            summary=f"Missing <html> or </html> tags in {target_file}",
             remediation="Wrap the document in <html lang=\"en\"> ... </html>"
         ))
 
     if "<head>" not in content or "</head>" not in content:
         defects.append(QADefect(
-            target="index.html",
+            target=target_file,
             role_hint="structure",
             severity="critical",
-            summary="Missing <head> section",
+            summary=f"Missing <head> section in {target_file}",
             remediation="Include a valid <head> element with meta charset, viewport, and title"
         ))
 
     if "viewport" not in content:
         defects.append(QADefect(
-            target="index.html",
+            target=target_file,
             role_hint="structure",
             severity="medium",
-            summary="Missing responsive viewport meta tag",
+            summary=f"Missing responsive viewport meta tag in {target_file}",
             remediation="Add <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
         ))
 
     if 'href="styles.css"' not in content and "href='styles.css'" not in content:
         defects.append(QADefect(
-            target="index.html",
+            target=target_file,
             role_hint="structure",
             severity="high",
-            summary="styles.css is not linked in index.html",
+            summary=f"styles.css is not linked in {target_file}",
             remediation="Add <link rel=\"stylesheet\" href=\"styles.css\"> inside <head>"
         ))
 
     if "script.js" not in content:
         defects.append(QADefect(
-            target="index.html",
+            target=target_file,
             role_hint="structure",
             severity="high",
-            summary="script.js is not referenced in index.html",
+            summary=f"script.js is not referenced in {target_file}",
             remediation="Add <script src=\"script.js\" defer></script>"
         ))
+
+    return defects
+
+
+def audit_links(content: str, current_file: str, sandbox: Sandbox) -> List[QADefect]:
+    """Deterministic link check: verifies every <a href> points to a valid file or anchor."""
+    defects = []
+    hrefs = re.findall(r'href=[\'"]([^\'"]+)[\'"]', content)
+    for href in hrefs:
+        href_clean = href.strip()
+        if not href_clean or href_clean == "#":
+            defects.append(QADefect(
+                target=current_file,
+                role_hint="structure",
+                severity="medium",
+                summary=f"Placeholder or empty link '{href}' found in {current_file}",
+                remediation="Point link to a valid relative page (e.g. index.html) or section anchor"
+            ))
+            continue
+
+        if href_clean.startswith(("http://", "https://", "mailto:", "tel:", "javascript:")):
+            continue
+
+        # Relative link
+        parts = href_clean.split("#")
+        target_page = parts[0]
+        anchor = parts[1] if len(parts) > 1 else ""
+
+        if target_page:
+            if not sandbox.file_exists(target_page):
+                defects.append(QADefect(
+                    target=current_file,
+                    role_hint="structure",
+                    severity="critical",
+                    summary=f"Broken link in {current_file}: '{href_clean}' targets nonexistent page '{target_page}'",
+                    remediation=f"Ensure {target_page} is generated or update href"
+                ))
+        elif anchor:
+            # Same-page anchor
+            if f'id="{anchor}"' not in content and f"id='{anchor}'" not in content:
+                defects.append(QADefect(
+                    target=current_file,
+                    role_hint="structure",
+                    severity="medium",
+                    summary=f"Anchor link '#{anchor}' in {current_file} does not match any id in the page",
+                    remediation=f"Add id=\"{anchor}\" to the target section in {current_file}"
+                ))
 
     return defects
 
@@ -204,25 +251,63 @@ def audit_js(content: str, html_content: Optional[str] = None) -> List[QADefect]
 
 
 def run_qa_audit(sandbox: Sandbox) -> QAAuditReport:
-    """Execute full automated QA verification suite against sandbox workspace."""
+    """Execute full automated QA verification suite against sandbox workspace across all pages."""
     defects: List[QADefect] = []
     checks_passed: List[str] = []
 
-    # 1. Existence check
-    html_exists = sandbox.file_exists("index.html")
+    # 1. Determine expected pages from spec.json if available
+    expected_pages = ["index.html"]
+    if sandbox.file_exists("spec.json"):
+        try:
+            import json
+            spec_raw = json.loads(sandbox.read_file("spec.json"))
+            if "pages" in spec_raw and isinstance(spec_raw["pages"], list):
+                expected_pages = [p.get("file", f"{p.get('id', 'page')}.html") for p in spec_raw["pages"] if isinstance(p, dict)]
+                if not expected_pages:
+                    expected_pages = ["index.html"]
+        except Exception:
+            expected_pages = ["index.html"]
+
+    # Also discover any extra .html files in sandbox
+    for f in sandbox.list_files():
+        if f.endswith(".html") and f not in expected_pages:
+            expected_pages.append(f)
+
+    # 2. Check existence of expected pages
+    all_pages_exist = True
+    combined_html = ""
+    for page_file in expected_pages:
+        if not sandbox.file_exists(page_file):
+            all_pages_exist = False
+            defects.append(QADefect(
+                target=page_file,
+                role_hint="structure",
+                severity="critical",
+                summary=f"Required page '{page_file}' does not exist in sandbox",
+                remediation=f"Generate {page_file}"
+            ))
+        else:
+            checks_passed.append(f"File {page_file} exists")
+            page_content = sandbox.read_file(page_file)
+            combined_html += "\n" + page_content
+            
+            # Audit HTML semantics
+            html_def = audit_html(page_content, target_file=page_file)
+            if not html_def:
+                checks_passed.append(f"HTML structure for {page_file} valid")
+            else:
+                defects.extend(html_def)
+
+            # Audit relative links & anchor links
+            link_def = audit_links(page_content, current_file=page_file, sandbox=sandbox)
+            if not link_def:
+                checks_passed.append(f"Links in {page_file} valid")
+            else:
+                defects.extend(link_def)
+
+    # 3. Check CSS & JS existence
     css_exists = sandbox.file_exists("styles.css")
     js_exists = sandbox.file_exists("script.js")
-
-    if not html_exists:
-        defects.append(QADefect(
-            target="index.html",
-            role_hint="structure",
-            severity="critical",
-            summary="index.html does not exist in sandbox",
-            remediation="Generate index.html"
-        ))
-    else:
-        checks_passed.append("File index.html exists")
 
     if not css_exists:
         defects.append(QADefect(
@@ -234,6 +319,12 @@ def run_qa_audit(sandbox: Sandbox) -> QAAuditReport:
         ))
     else:
         checks_passed.append("File styles.css exists")
+        css_content = sandbox.read_file("styles.css")
+        css_def = audit_css(css_content)
+        if not css_def:
+            checks_passed.append("CSS syntax and responsive rules valid")
+        else:
+            defects.extend(css_def)
 
     if not js_exists:
         defects.append(QADefect(
@@ -245,36 +336,16 @@ def run_qa_audit(sandbox: Sandbox) -> QAAuditReport:
         ))
     else:
         checks_passed.append("File script.js exists")
-
-    # 2. Content audits
-    html_content = sandbox.read_file("index.html") if html_exists else ""
-    css_content = sandbox.read_file("styles.css") if css_exists else ""
-    js_content = sandbox.read_file("script.js") if js_exists else ""
-
-    if html_content:
-        html_defects = audit_html(html_content)
-        if not html_defects:
-            checks_passed.append("HTML structure and semantic tags valid")
+        js_content = sandbox.read_file("script.js")
+        js_def = audit_js(js_content, html_content=combined_html)
+        if not js_def:
+            checks_passed.append("JavaScript syntax and DOM selector links valid across all pages")
         else:
-            defects.extend(html_defects)
-
-    if css_content:
-        css_defects = audit_css(css_content)
-        if not css_defects:
-            checks_passed.append("CSS syntax and responsive rules valid")
-        else:
-            defects.extend(css_defects)
-
-    if js_content:
-        js_defects = audit_js(js_content, html_content=html_content)
-        if not js_defects:
-            checks_passed.append("JavaScript syntax and DOM selector links valid")
-        else:
-            defects.extend(js_defects)
+            defects.extend(js_def)
 
     critical_count = sum(1 for d in defects if d.severity in ("critical", "high"))
     score = max(0.0, 100.0 - (len(defects) * 15.0))
-    passed = (critical_count == 0) and html_exists and css_exists and js_exists
+    passed = (critical_count == 0) and all_pages_exist and css_exists and js_exists
 
     return QAAuditReport(
         passed=passed,

@@ -20,12 +20,8 @@ from runtime.qa import run_qa_audit
 from runtime.sandbox import Sandbox
 
 
-@pytest.mark.asyncio
-async def test_baseline_current_capabilities(tmp_path):
+def test_baseline_current_capabilities(tmp_path):
     run_id = "baseline_audit_run"
-    db_file = str(tmp_path / "blackboard.db")
-    blackboard = Blackboard(db_file)
-    event_log = EventLog(db_file)
     sandbox_dir = tmp_path / ".sandbox"
     sandbox = Sandbox(run_id=run_id, base_dir=str(sandbox_dir))
 
@@ -118,8 +114,40 @@ body { background: var(--bg-primary); color: var(--text-primary); }
     assert not has_spec, "Baseline confirms spec.json does not yet exist"
     assert not has_menu, "Baseline confirms menu.html does not exist"
     assert not has_about, "Baseline confirms about.html does not exist"
-    # Current QA erroneously passes this run because it only checks brace balance & file existence of index/styles/script:
-    assert qa_report.passed is True, "Baseline confirms current QA passes incomplete sites"
+    # QA now accurately catches broken links and rejects incomplete sites:
+    assert qa_report.passed is False, "QA accurately catches broken links and rejects incomplete sites"
+    defects = qa_report.defects
+    assert any("menu.html" in d.summary for d in defects)
+    assert any("about.html" in d.summary for d in defects)
+
+
+def test_phase2_multi_page_navigation_passes(tmp_path):
+    """Verify that when all pages in spec.pages are properly generated, QA passes with 0 broken links."""
+    from runtime.render import render_full_page
+    from runtime.spec import generate_default_spec
+
+    run_id = "phase2_verified_run"
+    sandbox = Sandbox(run_id=run_id, base_dir=str(tmp_path / ".sandbox"))
+
+    spec = generate_default_spec("Modern rustic bakery with 3 pages")
+    sandbox.write_file("spec.json", spec.model_dump_json(indent=2))
+    sandbox.write_file("styles.css", ":root { --bg: #fff; --text: #000; }\nbody { color: var(--text); }\n@media(max-width:768px){}")
+    sandbox.write_file("script.js", "console.log('loaded');")
+
+    # Generate each page in spec using render_full_page
+    for page in spec.pages:
+        sec_markup = "".join(f"<section id=\"{s.id}\"><h2>{s.purpose}</h2></section>" for s in page.sections)
+        content = f"<div class=\"page-intro\"><h1>{page.title}</h1><p>{spec.tagline}</p></div>{sec_markup}"
+        full_html = render_full_page(spec, page, content)
+        sandbox.write_file(page.file, full_html)
+
+    report = run_qa_audit(sandbox)
+    assert report.passed is True, f"Expected QA to pass for multi-page generated site, defects: {report.defects}"
+    assert report.score >= 85.0
+    # Confirm every page exists and has 0 broken link defects
+    for page in spec.pages:
+        assert sandbox.file_exists(page.file)
+        assert not any(d.target == page.file and "Broken link" in d.summary for d in report.defects)
 
 
 if __name__ == "__main__":

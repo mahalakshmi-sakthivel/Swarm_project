@@ -403,6 +403,44 @@ class SwarmAgent:
                 payload={"bytes": write_res["bytes"], "summary": f"Synthesized SiteSpec for {spec.brand_name} ({spec.site_type})"}
             )
 
+            # Dynamically seed structure tasks for all pages in spec.pages
+            structure_task_ids = []
+            for idx, p in enumerate(spec.pages):
+                t_id = "task-01-structure" if idx == 0 else f"task-01-structure-{p.id}"
+                sec_list = ", ".join(f"#{s.id} ({s.purpose})" for s in p.sections)
+                p_task = Task(
+                    id=t_id,
+                    run_id=self.run_id,
+                    title=f"Page Layout: {p.title} ({p.file})",
+                    description=(
+                        f"Generate inner <main> content for page '{p.title}' ({p.file}). "
+                        f"Sections: {sec_list}. Follow spec.json strictly."
+                    ),
+                    role_hint="structure",
+                    status="open",
+                    priority=5,
+                    target=p.file,
+                    depends_on=["task-00-plan"]
+                )
+                self.blackboard.add_task(p_task)
+                structure_task_ids.append(t_id)
+
+            # Update styling, script, and QA tasks to depend on all structure tasks
+            style_task = self.blackboard.get_task(self.run_id, "task-02-styling")
+            if style_task:
+                style_task.depends_on = ["task-00-plan"] + structure_task_ids
+                self.blackboard.add_task(style_task)
+
+            script_task = self.blackboard.get_task(self.run_id, "task-03-script")
+            if script_task:
+                script_task.depends_on = ["task-00-plan"] + structure_task_ids
+                self.blackboard.add_task(script_task)
+
+            qa_task = self.blackboard.get_task(self.run_id, "task-04-qa")
+            if qa_task:
+                qa_task.depends_on = ["task-00-plan"] + structure_task_ids + ["task-02-styling", "task-03-script"]
+                self.blackboard.add_task(qa_task)
+
             self.blackboard.update_task_status(self.run_id, target_task.id, self.agent_id, "done")
             self.event_log.append(
                 run_id=self.run_id,
@@ -462,6 +500,19 @@ Decide your action:
             if action_data.action == "write_file":
                 file_path = action_data.args.get("path", target_task.target or "index.html")
                 file_content = action_data.args.get("content", "")
+
+                # Deterministic HTML Page Assembly via Jinja2 (Phase 2)
+                if file_path.endswith(".html") and self.sandbox.file_exists("spec.json"):
+                    from runtime.render import render_full_page
+                    import json
+                    try:
+                        spec_raw = json.loads(self.sandbox.read_file("spec.json"))
+                        spec_obj = SiteSpec(**spec_raw)
+                        matching_page = next((p for p in spec_obj.pages if p.file == file_path), None)
+                        if matching_page:
+                            file_content = render_full_page(spec_obj, matching_page, file_content)
+                    except Exception as err:
+                        logger.warning(f"Error compiling deterministic page HTML for '{file_path}': {err}")
 
                 write_res = write_file(self.sandbox, file_path, file_content)
 
