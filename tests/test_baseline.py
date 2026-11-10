@@ -134,12 +134,17 @@ def test_phase2_multi_page_navigation_passes(tmp_path):
     sandbox.write_file("spec.json", spec.model_dump_json(indent=2))
     sandbox.write_file("base.css", generate_base_css(spec.theme))
     sandbox.write_file("styles.css", ".page-intro { margin-bottom: 2rem; color: var(--text-primary); }")
-    sandbox.write_file("script.js", "console.log('loaded');")
+    sandbox.write_file("script.js", """
+    // Feature handlers: smooth-scroll and contact-form-validation
+    document.querySelectorAll('a[href^="#"]').forEach(a => a.addEventListener('click', () => {}));
+    const f = document.querySelector('form');
+    if (f) f.addEventListener('submit', (e) => e.preventDefault());
+    """)
 
     # Generate each page in spec using render_full_page
     for page in spec.pages:
         sec_markup = "".join(f"<section id=\"{s.id}\"><h2>{s.purpose}</h2></section>" for s in page.sections)
-        content = f"<div class=\"page-intro\"><h1>{page.title}</h1><p>{spec.tagline}</p></div>{sec_markup}"
+        content = f"<div class=\"page-intro\"><h1>{page.title}</h1><p>Artisanal restaurant and bakery: {spec.tagline}</p><form id=\"form-{page.id}\"></form></div>{sec_markup}"
         full_html = render_full_page(spec, page, content)
         sandbox.write_file(page.file, full_html)
 

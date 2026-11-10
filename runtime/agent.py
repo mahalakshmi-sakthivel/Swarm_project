@@ -198,6 +198,28 @@ class SwarmAgent:
         critical_or_high_defects = [d for d in report.defects if d.severity in ("critical", "high")]
 
         if critical_or_high_defects:
+            # Check repair cycle limit (max 3 cycles per run)
+            all_tasks_now = self.blackboard.list_tasks(self.run_id)
+            prior_fix_tasks = [t for t in all_tasks_now if t.id.startswith("fix-")]
+            if len(prior_fix_tasks) >= 3:
+                logger.warning(f"Run '{self.run_id}' reached maximum 3 repair cycles ({len(prior_fix_tasks)} fix tasks). Concluding with partial status.")
+                self.event_log.append(
+                    run_id=self.run_id,
+                    agent_id=self.agent_id,
+                    event_type="qa_partial",
+                    target="sandbox",
+                    payload={
+                        "status": "partial",
+                        "score": report.score,
+                        "coverage_percent": report.coverage_percent,
+                        "remaining_defects": [{"target": d.target, "summary": d.summary, "severity": d.severity, "rule": d.rule} for d in report.defects]
+                    }
+                )
+                if claimed_task:
+                    self.blackboard.update_task_status(self.run_id, claimed_task.id, self.agent_id, "done")
+                self.blackboard.consume_signal(self.run_id, "need_qa")
+                return True
+
             # Defect found: Log test_failed event and spawn correction tasks
             logger.warning(f"QA Audit detected {len(critical_or_high_defects)} actionable defects in run '{self.run_id}'")
             self.event_log.append(

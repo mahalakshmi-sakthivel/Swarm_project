@@ -202,6 +202,11 @@ class Swarm:
                         converged = True
                         break
                     else:
+                        all_tasks_now = self.blackboard.list_tasks(self.run_id)
+                        prior_fix_tasks = [t for t in all_tasks_now if t.id.startswith("fix-")]
+                        if len(prior_fix_tasks) >= 3 and not pending_bugs:
+                            logger.info(f"Maximum 3 repair cycles reached for '{self.run_id}'. Concluding run honestly with partial status.")
+                            break
                         logger.debug("Tasks finished but QA detected issues or pending signals. Continuing loop.")
 
         finally:
@@ -221,11 +226,13 @@ class Swarm:
         return {
             "run_id": self.run_id,
             "converged": converged,
+            "status": "converged" if converged else ("partial" if len(done_tasks) >= 4 else "failed"),
             "elapsed_seconds": elapsed,
             "total_tasks": len(all_tasks),
             "completed_tasks": len(done_tasks),
             "qa_passed": qa_report.passed,
             "qa_score": qa_report.score,
+            "coverage_percent": qa_report.coverage_percent,
             "qa_defects": [d.__dict__ for d in qa_report.defects],
             "sandbox_files": self.sandbox.list_files()
         }

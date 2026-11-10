@@ -258,3 +258,4 @@ def fill_template_placeholders(template_raw: str, spec: SiteSpec, page: PageSpec
     hydrated = re.sub(r"\{\{\s*tagline[^}]*\}\}", spec.tagline or "", hydrated)
     hydrated = re.sub(r"\{\{\s*brand_name\s*\}\}", spec.brand_name, hydrated)
     return hydrated
+

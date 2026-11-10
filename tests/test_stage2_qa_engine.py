@@ -62,6 +62,7 @@ def test_qa_passes_valid_project(tmp_path):
   <script src="script.js" defer></script>
 </head>
 <body>
+  <h1>Valid Site</h1>
   <button class="mobile-menu-btn">Menu</button>
   <nav class="nav-links"></nav>
 </body>

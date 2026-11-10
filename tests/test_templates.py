@@ -79,3 +79,4 @@ def test_all_starter_templates_comply_with_base_css_classes():
         content = html_file.read_text(encoding="utf-8")
         defects = audit_html_classes(content, html_file.name)
         assert len(defects) == 0, f"Template {html_file.relative_to(TEMPLATES_DIR)} has unallowed classes: {[d.summary for d in defects]}"
+

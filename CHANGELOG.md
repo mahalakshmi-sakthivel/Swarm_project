@@ -2,6 +2,23 @@
 
 All notable changes to the Swarm Website Builder project will be documented in this file.
 
+## [Phase 5: Real Deterministic QA Suite & Strict Convergence] - 2026-11-10
+### Added
+- Complete rewrite of `runtime/qa.py` with 9 deterministic rules producing structured defect records (`{target, line, rule, severity, summary, remediation, req_id}`):
+  1. **Link Check (`link-check`)**: Verifies every `<a href>` resolves to an existing file in the sandbox, an anchor `#id` on the target page, or an external URL. Explicitly flags empty `#` placeholders and dead links with line numbers.
+  2. **Class Check (`class-check`)**: Validates every class against `base.css` whitelist, `styles.css` classes, and dynamic structural patterns.
+  3. **Requirements Check (`requirements-check`)**: Validates that all page section IDs exist in HTML, all `spec.features` have corresponding markup or JS handlers, maps back to requirement IDs (R1..Rn), and computes live requirement coverage percentage.
+  4. **Theme Check (`theme-check`)**: Enforces variable usage; rejects hardcoded hex colors (`#[0-9a-fA-F]{3,8}`) and unauthorized fonts outside `:root`.
+  5. **JS Check (`js-check`)**: Validates bracket balance (`{}`, `()`, `[]`) and verifies that all `getElementById` and `querySelector` targets exist in the combined HTML.
+  6. **Accessibility Check (`accessibility-check`)**: Enforces exactly one `<h1>` per page, non-empty `alt` attributes on all images, and explicit `<label for="...">` or `aria-label` associations on form inputs.
+  7. **Placeholder Check (`placeholder-check`)**: Rejects `"Lorem ipsum"`, `"TODO"`, `"FIXME"`, `"Your text here"`, and empty hrefs with line numbers.
+  8. **Responsive Check (`responsive-check`)**: Verifies responsive viewport meta tags, `@media` breakpoints, and fluid grid layouts.
+  9. **Strict Convergence Decision**: A run is ONLY marked "converged" when checks 1–6 have zero critical or high errors and requirement coverage is 100%.
+- Maximum 3 repair cycles limit in `runtime/agent.py` and `runtime/swarm.py`: if actionable defects remain after 3 fix iterations, the swarm honestly marks the run as `"partial"` rather than marking broken sites as converged.
+- `tests/test_qa_phase5.py`: 5 comprehensive unit tests verifying link check rejections, accessibility rules, placeholder detection, requirement mapping, and strict convergence criteria.
+
+---
+
 ## [Phase 4: Templates per Site Type & Few-Shot Prompts] - 2026-11-10
 ### Added
 - Curated `/templates` directory with hand-crafted starter layout templates across all primary site types:
