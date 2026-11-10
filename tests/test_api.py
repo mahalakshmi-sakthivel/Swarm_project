@@ -158,9 +158,9 @@ def test_websocket_event_streaming(test_client, seed_test_run):
     with test_client.websocket_connect(f"/ws/runs/{seed_test_run}") as ws:
         # First message should be historical event
         msg1 = ws.receive_json()
-        assert msg1["type"] in ("event", "state_snapshot")
+        assert msg1["type"] in ("history_event", "event", "state_snapshot")
 
         # Second message should arrive promptly
         msg2 = ws.receive_json()
-        assert msg2["type"] in ("event", "state_snapshot")
+        assert msg2["type"] in ("history_event", "event", "state_snapshot")
 

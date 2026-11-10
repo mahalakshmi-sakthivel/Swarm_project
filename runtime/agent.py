@@ -18,6 +18,7 @@ from runtime.llm import ActionPayload, InitialTasksPayload, QwenClient
 from runtime.qa import run_qa_audit
 from runtime.roles import SwarmRole, get_role_by_hint
 from runtime.sandbox import Sandbox
+from runtime.spec import SiteSpec, generate_default_spec, parse_or_repair_spec
 from runtime.tools import write_file
 
 logger = logging.getLogger("runtime.agent")
@@ -62,18 +63,32 @@ class SwarmAgent:
 
     async def seed_initial_tasks(self, prompt: str) -> List[Task]:
         """
-        Instant deterministic peer seeding: Splits the goal prompt into the 4 initial tasks.
-        Seeds immediately without burning a 2-minute LLM cycle.
+        Instant deterministic peer seeding: Splits the goal prompt into structured tasks,
+        starting with task-00-plan to synthesize the canonical SiteSpec contract (spec.json).
         """
         logger.info(f"Agent '{self.agent_id}' seeding initial role-specialized tasks for: '{prompt}'...")
         prompt_snippet = prompt[:60] + "..." if len(prompt) > 60 else prompt
 
         initial_tasks_def = [
             {
+                "id": "task-00-plan",
+                "title": f"Synthesize SiteSpec Contract (spec.json) for '{prompt_snippet}'",
+                "description": (
+                    f"Analyze user requirements for: '{prompt}'. "
+                    f"Synthesize the canonical SiteSpec contract in spec.json detailing site_type, brand_name, "
+                    f"tagline, audience, tone, pages hierarchy, nav order, theme color tokens, and concrete requirements checklist."
+                ),
+                "role_hint": "integration",
+                "priority": 10,
+                "target": "spec.json",
+                "depends_on": []
+            },
+            {
                 "id": "task-01-structure",
                 "title": f"HTML5 Structure for '{prompt_snippet}'",
                 "description": (
                     f"Create a complete, rich semantic HTML5 document in index.html tailored precisely to the user's requirements: '{prompt}'. "
+                    f"Follow spec.json strictly for brand_name, sections, and class names. "
                     f"Design meaningful sections, headers, cards, data displays, interactive forms, or widgets directly reflecting the prompt requirements. "
                     f"Include a responsive navigation bar, a compelling hero/header section, rich content sections specific to the website type, and a footer. "
                     f"Link styles.css in <head> and script.js with defer. Ensure all elements have clear semantic class names and IDs."
@@ -81,15 +96,14 @@ class SwarmAgent:
                 "role_hint": "structure",
                 "priority": 5,
                 "target": "index.html",
-                "depends_on": []
+                "depends_on": ["task-00-plan"]
             },
             {
                 "id": "task-02-styling",
                 "title": "Design System & Responsive Styles (styles.css)",
                 "description": (
                     f"Design a complete, vibrant CSS design system in styles.css strictly adhering to the theme and requirements in: '{prompt}'. "
-                    f"THEME INSTRUCTION: If the prompt specifies a theme (e.g. dark theme, cyberpunk neon, clean light mode, pastel, warm earth tones, fintech navy/emerald), "
-                    f"strictly implement that exact theme with high visual fidelity. If unspecified, pick a rich modern color palette. "
+                    f"Follow spec.json strictly for color tokens, mood, radius, and typography. "
                     f"Define cohesive CSS custom properties in :root (--bg-primary, --bg-secondary, --bg-card, --text-primary, --text-secondary, "
                     f"--accent-primary, --accent-secondary, --accent-gradient, --border, --shadow-lg). "
                     f"NEVER use dull gray or plain monochrome for accents. Implement badges/pills (.badge, .tag), "
@@ -100,30 +114,30 @@ class SwarmAgent:
                 "role_hint": "style",
                 "priority": 4,
                 "target": "styles.css",
-                "depends_on": ["task-01-structure"]
+                "depends_on": ["task-00-plan", "task-01-structure"]
             },
             {
                 "id": "task-03-script",
                 "title": "Client-Side Functionality & Interactivity (script.js)",
                 "description": (
                     f"Implement clean vanilla ES6+ JavaScript in script.js to power the interactive features required for: '{prompt}'. "
-                    f"Provide dynamic functionality matching the elements present in index.html (e.g., mobile navigation toggle, "
+                    f"Provide dynamic functionality matching the elements present in index.html and features defined in spec.json (e.g., mobile navigation toggle, "
                     f"live calculations, data filtering, modal dialogs, smooth scrolling, tab switching, or simulated real-time updates). "
                     f"Wrap all DOM lookups with null checks so no runtime errors occur. Output full working JavaScript."
                 ),
                 "role_hint": "script",
                 "priority": 3,
                 "target": "script.js",
-                "depends_on": ["task-01-structure"]
+                "depends_on": ["task-00-plan", "task-01-structure"]
             },
             {
                 "id": "task-04-qa",
                 "title": "Automated Quality Assurance and Asset Audit",
-                "description": "Deterministic validation of HTML, CSS, and JS. Verify links, selectors, and accessibility.",
+                "description": "Deterministic validation of HTML, CSS, JS, and spec.json conformance. Verify links, selectors, and accessibility.",
                 "role_hint": "qa",
                 "priority": 1,
                 "target": "all",
-                "depends_on": ["task-01-structure", "task-02-styling", "task-03-script"]
+                "depends_on": ["task-00-plan", "task-01-structure", "task-02-styling", "task-03-script"]
             }
         ]
 
@@ -362,16 +376,58 @@ class SwarmAgent:
             payload={"task_id": target_task.id, "title": target_task.title, "role": self.role}
         )
 
-        # 3. ACT: Generate action via Qwen 3.5
+        # Retrieve overarching user goal prompt from blackboard
+        goal_data = self.blackboard.get_goal(self.run_id) or {}
+        user_goal_prompt = goal_data.get("prompt", "")
+
+        # 3. ACT: Handle task execution
+        # Check if this is the architectural planning task (task-00-plan)
+        if target_task.id == "task-00-plan":
+            logger.info(f"Coordinator '{self.agent_id}' synthesizing SiteSpec contract for: '{user_goal_prompt}'...")
+            spec = generate_default_spec(user_goal_prompt)
+            spec_json = spec.model_dump_json(indent=2)
+            write_res = write_file(self.sandbox, "spec.json", spec_json)
+
+            self.blackboard.record_artifact(
+                run_id=self.run_id,
+                path="spec.json",
+                content_hash=write_res["content_hash"],
+                author_agent=self.agent_id
+            )
+
+            self.event_log.append(
+                run_id=self.run_id,
+                agent_id=self.agent_id,
+                event_type="file_edit",
+                target="spec.json",
+                payload={"bytes": write_res["bytes"], "summary": f"Synthesized SiteSpec for {spec.brand_name} ({spec.site_type})"}
+            )
+
+            self.blackboard.update_task_status(self.run_id, target_task.id, self.agent_id, "done")
+            self.event_log.append(
+                run_id=self.run_id,
+                agent_id=self.agent_id,
+                event_type="task_done",
+                target="spec.json",
+                payload={"task_id": target_task.id}
+            )
+
+            # Emit initial structure signal to awaken structure agent
+            primary_file = spec.pages[0].file if spec.pages else "index.html"
+            self.blackboard.emit_signal(self.run_id, "need_structure", primary_file, self.agent_id)
+            self.current_task = None
+            return True
+
+        # For all other tasks, assemble prompt with shared spec.json contract
         existing_files = self.sandbox.list_files()
         target_file = target_task.target.split(",")[0].strip() if target_task.target else "index.html"
         current_content = ""
         if self.sandbox.file_exists(target_file):
             current_content = f"\nExisting content of '{target_file}':\n```\n{self.sandbox.read_file(target_file)}\n```\n"
 
-        # Retrieve overarching user goal prompt from blackboard
-        goal_data = self.blackboard.get_goal(self.run_id) or {}
-        user_goal_prompt = goal_data.get("prompt", "")
+        spec_contract = ""
+        if self.sandbox.file_exists("spec.json"):
+            spec_contract = f"\nSHARED SITE SPECIFICATION CONTRACT (spec.json - STRICTLY FOLLOW THIS):\n```json\n{self.sandbox.read_file('spec.json')}\n```\n"
 
         # Also supply index.html context to style and script agents so they match DOM selectors
         context_files = ""
@@ -381,7 +437,7 @@ class SwarmAgent:
         user_prompt = f"""
 OVERALL WEBSITE GOAL & REQUIREMENTS:
 "{user_goal_prompt}"
-
+{spec_contract}
 Current Task: {target_task.title}
 Task ID: {target_task.id}
 Description: {target_task.description}

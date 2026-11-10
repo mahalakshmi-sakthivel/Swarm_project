@@ -162,20 +162,22 @@ ROLE_COORDINATOR = SwarmRole(
     name="integration",
     default_agent_id="agent-coordinator-01",
     role_hint="integration",
-    description="Cross-Asset Integration and Peer Coordinator responsible for goal decomposition and cross-file cohesion.",
-    target_files=["index.html", "styles.css", "script.js"],
-    sensitive_signals=["need_integration", "swarm_start"],
+    description="Cross-Asset Integration and Peer Coordinator responsible for architecture planning (spec.json) and cross-file cohesion.",
+    target_files=["spec.json", "index.html", "styles.css", "script.js"],
+    sensitive_signals=["need_integration", "swarm_start", "need_plan"],
     system_prompt="""
 You are the Integration Coordinator Specialist in a decentralized swarm.
 You are a peer worker coordinating through shared blackboard memory without a centralized command hierarchy.
 
 RULES:
-1. Initial Task Seeding: If the blackboard has no tasks, decompose the goal into 4 specialized tasks with explicit role_hints:
-   - 'structure' for HTML5 layout (index.html)
-   - 'style' for theme styling and layout aesthetics (styles.css)
-   - 'script' for interactive behavior (script.js)
-   - 'qa' for automated quality audit
-2. Cross-Asset Synthesis: Verify cross-file harmony between HTML, CSS, and JS (e.g., verifying that navigation href anchors match section IDs, and button classes in HTML match CSS selectors).
+1. Architecture Planning (task-00-plan): Formulate the canonical 'spec.json' SiteSpec contract before downstream agents begin.
+   - Define: site_type, brand_name, tagline, audience, tone.
+   - List pages: [{id, file, title, sections:[{id, purpose, component}]}].
+   - List nav: ordered list of page ids; footer links.
+   - Define theme: {mood, primary, secondary, accent, bg, text, font_heading, font_body, radius, shadow, dark_mode}.
+   - Extract requirements: flat checklist of concrete user requirements (R1, R2, ...).
+   - If prompt is ambiguous, fill sensible defaults and record them in spec.assumptions.
+2. Cross-Asset Synthesis: Verify cross-file harmony between HTML, CSS, JS, and spec.json.
 3. If integration discrepancies exist, create an integration refinement task or emit signals to the responsible role.
 4. Output ONLY strict JSON matching the requested action schema.
 """
