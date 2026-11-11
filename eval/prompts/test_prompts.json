@@ -1,0 +1,107 @@
+[
+  {
+    "id": "prompt-01-restaurant-rustic",
+    "site_type": "restaurant",
+    "prompt": "Restaurant site, rustic theme, 3 pages (home, menu, reservations), reservation form, chef philosophy",
+    "expected_pages": 3,
+    "key_features": ["reservation-form", "menu-grid"]
+  },
+  {
+    "id": "prompt-02-restaurant-seafood",
+    "site_type": "restaurant",
+    "prompt": "Coastal seafood bistro website, navy and cream palette, fresh catch specials grid, hours and location, booking form",
+    "expected_pages": 2,
+    "key_features": ["booking-form", "specials-grid"]
+  },
+  {
+    "id": "prompt-03-saas-dark",
+    "site_type": "saas",
+    "prompt": "SaaS landing page with pricing matrix, dark theme, interactive code preview, customer logos, early access waitlist",
+    "expected_pages": 1,
+    "key_features": ["pricing-table", "waitlist-form"]
+  },
+  {
+    "id": "prompt-04-saas-analytics",
+    "site_type": "saas",
+    "prompt": "Cloud analytics platform website, live metric counters, 3-tier subscription cards, feature comparison, contact sales modal",
+    "expected_pages": 1,
+    "key_features": ["metrics-counter", "pricing-matrix"]
+  },
+  {
+    "id": "prompt-05-portfolio-designer",
+    "site_type": "portfolio",
+    "prompt": "Creative front-end engineer portfolio, minimalist aesthetic, selected project cards with tags, case studies, contact form",
+    "expected_pages": 2,
+    "key_features": ["projects-grid", "contact-form"]
+  },
+  {
+    "id": "prompt-06-portfolio-photographer",
+    "site_type": "portfolio",
+    "prompt": "Architectural photographer portfolio, gallery grid with lightbox modal, client testimonials, booking inquiry form",
+    "expected_pages": 2,
+    "key_features": ["gallery-grid", "inquiry-form"]
+  },
+  {
+    "id": "prompt-07-store-apparel",
+    "site_type": "store",
+    "prompt": "Modern sustainable apparel brand website, product cards with price badges, add to bag buttons, eco-friendly trust badges",
+    "expected_pages": 1,
+    "key_features": ["product-grid", "trust-badges"]
+  },
+  {
+    "id": "prompt-08-store-coffee",
+    "site_type": "store",
+    "prompt": "Artisan coffee roaster storefront, single-origin bean catalog, subscription plan selector, brewing guide link, newsletter signup",
+    "expected_pages": 1,
+    "key_features": ["bean-catalog", "newsletter-form"]
+  },
+  {
+    "id": "prompt-09-blog-tech",
+    "site_type": "blog",
+    "prompt": "Tech publication and engineering journal, 3-column article grid with reading times, featured essay hero, newsletter subscription",
+    "expected_pages": 1,
+    "key_features": ["article-grid", "newsletter-signup"]
+  },
+  {
+    "id": "prompt-10-blog-travel",
+    "site_type": "blog",
+    "prompt": "Adventure travel blog with photo hero, destination guide cards, travel gear review section, author bio, search filter",
+    "expected_pages": 1,
+    "key_features": ["destination-grid", "author-bio"]
+  },
+  {
+    "id": "prompt-11-landing-mobile-app",
+    "site_type": "landing",
+    "prompt": "Mobile fitness app landing page, download CTA buttons, user testimonial carousel, feature walkthrough, FAQ accordion",
+    "expected_pages": 1,
+    "key_features": ["download-buttons", "faq-accordion"]
+  },
+  {
+    "id": "prompt-12-landing-webinar",
+    "site_type": "landing",
+    "prompt": "Executive AI workshop landing page with countdown timer, speaker profiles, agenda schedule, seat reservation form",
+    "expected_pages": 1,
+    "key_features": ["speaker-profiles", "reservation-form"]
+  },
+  {
+    "id": "prompt-13-agency-digital",
+    "site_type": "other",
+    "prompt": "Creative digital agency website, bold typography, client case studies, services list with hover effects, project inquiry form",
+    "expected_pages": 1,
+    "key_features": ["case-studies", "inquiry-form"]
+  },
+  {
+    "id": "prompt-14-clinic-dental",
+    "site_type": "other",
+    "prompt": "Modern dental clinic website, calming blue palette, services grid, patient reviews, appointment booking form, emergency contact",
+    "expected_pages": 1,
+    "key_features": ["services-grid", "appointment-form"]
+  },
+  {
+    "id": "prompt-15-nonprofit-ocean",
+    "site_type": "other",
+    "prompt": "Ocean conservation foundation website, donation goal progress bar, volunteer signup form, impact statistics, educational articles",
+    "expected_pages": 1,
+    "key_features": ["donation-bar", "volunteer-form"]
+  }
+]

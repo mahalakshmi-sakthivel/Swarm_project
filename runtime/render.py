@@ -50,16 +50,22 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 
         <!-- Nav CTA & Mobile Menu Toggle -->
         <div class="nav-actions">
-          {% if spec.site_type == 'restaurant' %}
+          {% if spec.site_type == 'restaurant' and 'about.html' in pages|map(attribute='file') %}
           <a href="about.html#contact" class="btn btn-primary nav-cta">Reserve a Table</a>
-          {% elif spec.site_type == 'saas' %}
-          <a href="index.html#contact" class="btn btn-primary nav-cta">Get Started</a>
-          {% elif spec.site_type == 'store' %}
-          <a href="index.html#products" class="btn btn-primary nav-cta">Shop Now</a>
-          {% else %}
+          {% elif spec.site_type == 'restaurant' and '#specials' in main_content %}
+          <a href="#specials" class="btn btn-primary nav-cta">Reserve a Table</a>
+          {% elif spec.site_type == 'saas' and '#pricing' in main_content %}
+          <a href="#pricing" class="btn btn-primary nav-cta">Get Started</a>
+          {% elif spec.site_type == 'store' and '#featured' in main_content %}
+          <a href="#featured" class="btn btn-primary nav-cta">Shop Now</a>
+          {% elif spec.site_type == 'blog' and '#newsletter' in main_content %}
+          <a href="#newsletter" class="btn btn-primary nav-cta">Subscribe</a>
+          {% elif '#contact' in main_content %}
           <a href="#contact" class="btn btn-primary nav-cta">Contact Us</a>
+          {% else %}
+          <a href="#hero" class="btn btn-primary nav-cta">Explore</a>
           {% endif %}
-          <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle navigation menu" aria-expanded="false">
+          <button class="mobile-menu-btn mobile-toggle" id="mobile-menu-btn" aria-label="Toggle navigation menu" aria-expanded="false">
             <span class="hamburger-bar"></span>
             <span class="hamburger-bar"></span>
             <span class="hamburger-bar"></span>

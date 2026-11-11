@@ -257,5 +257,18 @@ def fill_template_placeholders(template_raw: str, spec: SiteSpec, page: PageSpec
     hydrated = hydrated.replace("{{ tagline or \"Turn ideas into production-ready digital experiences in minutes with intelligent autonomous generation.\" }}", spec.tagline or "Turn ideas into production-ready digital experiences in minutes with intelligent autonomous generation.")
     hydrated = re.sub(r"\{\{\s*tagline[^}]*\}\}", spec.tagline or "", hydrated)
     hydrated = re.sub(r"\{\{\s*brand_name\s*\}\}", spec.brand_name, hydrated)
+
+    # Remap links to non-existent pages in single-page configurations to prevent dead link defects
+    existing_files = {p.file for p in spec.pages}
+    if "menu.html" not in existing_files:
+        hydrated = hydrated.replace('href="menu.html"', 'href="#specials"')
+    if "about.html" not in existing_files:
+        hydrated = hydrated.replace('href="about.html#contact"', 'href="#contact"')
+        hydrated = hydrated.replace('href="about.html"', 'href="#story"')
+    if "work.html" not in existing_files:
+        hydrated = hydrated.replace('href="work.html"', 'href="#projects"')
+    if "products.html" not in existing_files:
+        hydrated = hydrated.replace('href="products.html"', 'href="#featured"')
+
     return hydrated
 

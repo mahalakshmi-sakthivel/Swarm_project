@@ -57,7 +57,10 @@
       <p class="card-text">Get our bi-weekly dispatch delivered straight to your inbox. No spam, ever.</p>
       <form class="form" id="newsletter-form" style="margin-top: 1.5rem;">
         <div class="grid grid-2">
-          <input type="email" id="news-email" class="form-input" placeholder="you@domain.com" required>
+          <div>
+            <label for="news-email" class="form-label">Email Address</label>
+            <input type="email" id="news-email" name="email" class="form-input" placeholder="you@domain.com" aria-label="Email Address" required>
+          </div>
           <button type="submit" class="btn btn-primary">Subscribe</button>
         </div>
       </form>

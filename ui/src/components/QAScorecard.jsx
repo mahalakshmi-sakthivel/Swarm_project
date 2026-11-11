@@ -123,3 +123,4 @@ export default function QAScorecard({ qaData, runStatus }) {
     </div>
   );
 }
+

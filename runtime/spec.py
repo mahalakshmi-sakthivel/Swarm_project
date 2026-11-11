@@ -182,7 +182,7 @@ def generate_default_spec(prompt: str) -> SiteSpec:
                     sections=[
                         SectionSpec(id="hero", purpose="Brand welcome and signature specials", component="hero"),
                         SectionSpec(id="specials", purpose="Curated daily artisanal highlights", component="card-grid"),
-                        SectionSpec(id="testimonials", purpose="Guest quotes and culinary awards", component="testimonial"),
+                        SectionSpec(id="story", purpose="Origins and local ingredients ethos", component="testimonial"),
                     ]
                 ),
                 PageSpec(
@@ -191,7 +191,8 @@ def generate_default_spec(prompt: str) -> SiteSpec:
                     title=f"{brand} | Seasonal Menu",
                     sections=[
                         SectionSpec(id="menu-header", purpose="Menu introduction & dietary guide", component="hero"),
-                        SectionSpec(id="menu-categories", purpose="Categorized dishes with pricing", component="card-grid"),
+                        SectionSpec(id="starters", purpose="Appetizers and starters", component="card-grid"),
+                        SectionSpec(id="mains", purpose="Signature wood-fired entrees and plates", component="card-grid"),
                     ]
                 ),
                 PageSpec(
@@ -199,7 +200,8 @@ def generate_default_spec(prompt: str) -> SiteSpec:
                     file="about.html",
                     title=f"{brand} | Our Story & Reservations",
                     sections=[
-                        SectionSpec(id="story", purpose="Origins and local ingredients ethos", component="section"),
+                        SectionSpec(id="about-hero", purpose="Origins and culinary heritage", component="section"),
+                        SectionSpec(id="chef", purpose="Kitchen craft and executive chef story", component="testimonial"),
                         SectionSpec(id="contact", purpose="Table reservation & inquiry form", component="form"),
                     ]
                 )
@@ -257,17 +259,54 @@ def generate_default_spec(prompt: str) -> SiteSpec:
             ]
         assumptions.append(f"Structured multi-page site with {len(pages)} distinct pages")
     else:
-        # Single page with modular anchor sections
+        # Single page with modular anchor sections tailored to site_type
+        if site_type == "store":
+            sections = [
+                SectionSpec(id="hero", purpose="Headline and seasonal collection highlight", component="hero"),
+                SectionSpec(id="featured", purpose="Curated trending products and price badges", component="card-grid"),
+                SectionSpec(id="trust", purpose="Trust badges and shipping guarantees", component="stats"),
+            ]
+        elif site_type == "blog":
+            sections = [
+                SectionSpec(id="hero", purpose="Publication header and featured articles", component="hero"),
+                SectionSpec(id="featured", purpose="Latest dispatches and essays", component="card-grid"),
+                SectionSpec(id="newsletter", purpose="Newsletter subscription signup", component="form"),
+            ]
+        elif site_type == "portfolio":
+            sections = [
+                SectionSpec(id="hero", purpose="Headline and introduction", component="hero"),
+                SectionSpec(id="projects", purpose="Featured projects and case studies", component="card-grid"),
+                SectionSpec(id="skills", purpose="Core competencies and skills matrix", component="card-grid"),
+                SectionSpec(id="contact", purpose="Inquiry and contact form", component="form"),
+            ]
+        elif site_type == "saas":
+            sections = [
+                SectionSpec(id="hero", purpose="Headline and call to action", component="hero"),
+                SectionSpec(id="stats", purpose="Live statistics and platform metrics", component="stats"),
+                SectionSpec(id="features", purpose="Feature breakdown and capabilities", component="card-grid"),
+                SectionSpec(id="pricing", purpose="Tiered subscription plans", component="pricing"),
+                SectionSpec(id="contact", purpose="Inquiry form", component="form"),
+            ]
+        elif site_type == "landing":
+            sections = [
+                SectionSpec(id="hero", purpose="Headline and early access CTA", component="hero"),
+                SectionSpec(id="features", purpose="Workflow and core benefits", component="card-grid"),
+                SectionSpec(id="testimonials", purpose="Client reviews and social proof", component="testimonial"),
+                SectionSpec(id="contact", purpose="Early access waitlist form", component="form"),
+            ]
+        else:
+            sections = [
+                SectionSpec(id="hero", purpose="Headline and primary call to action", component="hero"),
+                SectionSpec(id="features", purpose="Core offerings or showcases", component="card-grid"),
+                SectionSpec(id="contact", purpose="User inquiry or order form", component="form"),
+            ]
+
         pages = [
             PageSpec(
                 id="home",
                 file="index.html",
                 title=f"{brand} | {tagline}",
-                sections=[
-                    SectionSpec(id="hero", purpose="Headline and primary call to action", component="hero"),
-                    SectionSpec(id="features", purpose="Core offerings or showcases", component="card-grid"),
-                    SectionSpec(id="contact", purpose="User inquiry or order form", component="form"),
-                ]
+                sections=sections
             )
         ]
         assumptions.append("Synthesized unified single-page layout with anchor navigation")

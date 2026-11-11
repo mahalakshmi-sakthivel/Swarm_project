@@ -62,3 +62,4 @@ export default function QuickEditBar({ runId, onEditSubmitted }) {
     </div>
   );
 }
+
