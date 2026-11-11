@@ -80,6 +80,34 @@ def get_run_components(run_id: str):
     return blackboard, event_log, sandbox
 
 
+def compute_run_status(run_id: str, blackboard: Blackboard, sandbox: Sandbox) -> str:
+    """
+    Deterministically compute unified run status across REST and WebSocket.
+    Guarantees zero flicker or race conditions between polling and streaming.
+    """
+    if run_id in ACTIVE_RUNS:
+        return "running"
+
+    explicit_status = RUN_STATUSES.get(run_id)
+    if explicit_status in ("converged", "completed"):
+        return explicit_status
+
+    qa = run_qa_audit(sandbox)
+    if qa.passed or blackboard.is_swarm_converged(run_id):
+        RUN_STATUSES[run_id] = "converged"
+        return "converged"
+
+    if (sandbox.sandbox_dir / "index.html").exists():
+        RUN_STATUSES[run_id] = "completed"
+        return "completed"
+
+    if explicit_status:
+        return explicit_status
+
+    return "incomplete"
+
+
+
 async def execute_swarm_task(run_id: str, prompt: str, model: str, reference_image: Optional[str] = None):
     """Background coroutine that executes the decentralized swarm until convergence."""
     logger.info(f"Background swarm execution started for run '{run_id}'")
@@ -180,15 +208,8 @@ def list_runs():
                     if goal:
                         prompt = goal.get("prompt", "")
                         created_at = goal.get("created_at", created_at)
-                    if not run_status or run_status == "failed":
-                        sb = Sandbox(run_id=run_id, base_dir=str(SANDBOX_DIR))
-                        qa_check = run_qa_audit(sb)
-                        if qa_check.passed:
-                            run_status = "converged"
-                        elif (sb.sandbox_dir / "index.html").exists():
-                            run_status = "completed"
-                        else:
-                            run_status = run_status or "incomplete"
+                    sb = Sandbox(run_id=run_id, base_dir=str(SANDBOX_DIR))
+                    run_status = compute_run_status(run_id, bb, sb)
 
                 runs.append({
                     "run_id": run_id,
@@ -222,18 +243,11 @@ def get_run_details(run_id: str):
         except Exception:
             pass
 
-    raw_status = RUN_STATUSES.get(run_id)
-    if not raw_status or raw_status == "failed":
-        if qa_report.passed:
-            raw_status = "converged"
-        elif (sandbox.sandbox_dir / "index.html").exists():
-            raw_status = "completed"
-        else:
-            raw_status = raw_status or "completed"
+    status_str = compute_run_status(run_id, blackboard, sandbox)
 
     return {
         "run_id": run_id,
-        "status": raw_status,
+        "status": status_str,
         "is_active": run_id in ACTIVE_RUNS,
         "goal": goal,
         "spec": spec_data,
@@ -511,14 +525,22 @@ async def websocket_event_stream(websocket: WebSocket, run_id: str):
                 signals = blackboard.get_active_signals(run_id)
                 artifacts = blackboard.list_artifacts(run_id)
                 files = sandbox.list_files()
+                qa_report = run_qa_audit(sandbox)
+                status_str = compute_run_status(run_id, blackboard, sandbox)
                 await websocket.send_json({
                     "type": "state_snapshot",
                     "data": {
-                        "status": RUN_STATUSES.get(run_id, "converged" if blackboard.is_swarm_converged(run_id) else "running"),
+                        "status": status_str,
                         "tasks": [t.model_dump() for t in tasks],
                         "signals": [s.model_dump() for s in signals],
                         "artifacts": [a.model_dump() for a in artifacts],
                         "files": files,
+                        "qa": {
+                            "passed": qa_report.passed,
+                            "score": qa_report.score,
+                            "defects": [d.__dict__ for d in qa_report.defects],
+                            "checks_passed": qa_report.checks_passed
+                        }
                     }
                 })
 
