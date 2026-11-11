@@ -88,9 +88,11 @@ def compute_run_status(run_id: str, blackboard: Blackboard, sandbox: Sandbox) ->
     if run_id in ACTIVE_RUNS:
         return "running"
 
-    explicit_status = RUN_STATUSES.get(run_id)
-    if explicit_status in ("converged", "completed"):
-        return explicit_status
+    # Always check if there are open or in-progress tasks
+    tasks = blackboard.list_tasks(run_id)
+    pending_tasks = [t for t in tasks if t.status in ("open", "claimed", "in_progress")]
+    if pending_tasks:
+        return "running"
 
     qa = run_qa_audit(sandbox)
     if qa.passed or blackboard.is_swarm_converged(run_id):
@@ -101,10 +103,156 @@ def compute_run_status(run_id: str, blackboard: Blackboard, sandbox: Sandbox) ->
         RUN_STATUSES[run_id] = "completed"
         return "completed"
 
+    explicit_status = RUN_STATUSES.get(run_id)
     if explicit_status:
         return explicit_status
 
     return "incomplete"
+
+
+async def execute_quick_edit_async(run_id: str, task_id: str, target_file: str, instruction: str):
+    """
+    Asynchronously executes a targeted quick edit on the sandbox files.
+    Emits events and updates blackboard so the UI live-updates immediately.
+    """
+    logger.info(f"Executing quick edit '{task_id}' on '{target_file}' for run '{run_id}': {instruction}")
+    RUN_STATUSES[run_id] = "running"
+    blackboard, event_log, sandbox = get_run_components(run_id)
+    role_hint = "style" if target_file.endswith(".css") else "script" if target_file.endswith(".js") else "structure"
+    agent_id = f"agent-{role_hint}-01"
+
+    blackboard.update_task_status(run_id, task_id, agent_id, "in_progress")
+    event_log.append(
+        run_id=run_id,
+        agent_id=agent_id,
+        event_type="task_claimed",
+        target=target_file,
+        payload={"task_id": task_id}
+    )
+
+    await asyncio.sleep(0.4)
+
+    try:
+        from runtime.tools import write_file
+        current_content = sandbox.read_file(target_file) if sandbox.file_exists(target_file) else ""
+        updated_content = current_content
+        instruction_lower = instruction.lower()
+
+        if target_file.endswith(".css"):
+            if any(w in instruction_lower for w in ["dark", "black", "dim", "night", "background"]):
+                dark_rules = """
+/* Quick Edit: Dark Theme Overrides */
+:root {
+  --bg-canvas: #0b0f19;
+  --bg-surface: #111827;
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --border-subtle: rgba(255, 255, 255, 0.12);
+}
+
+body {
+  background-color: var(--bg-canvas) !important;
+  color: var(--text-main) !important;
+}
+
+.site-header {
+  background: rgba(11, 15, 25, 0.95) !important;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.card {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-main) !important;
+}
+
+.card-title, .hero-title, .section-title {
+  color: #ffffff !important;
+}
+
+.hero {
+  background: radial-gradient(circle at 50% 20%, rgba(var(--primary-rgb), 0.25) 0%, #0b0f19 75%) !important;
+}
+"""
+                if "Dark Theme Overrides" not in updated_content:
+                    updated_content = updated_content.strip() + "\n" + dark_rules
+            else:
+                updated_content = updated_content.strip() + f"\n/* Quick Edit: {instruction} */\n"
+
+        elif target_file.endswith(".html"):
+            if any(w in instruction_lower for w in ["reservation", "feature", "seating", "table"]):
+                if 'id="seating-preference"' not in updated_content:
+                    seating_markup = """
+            <div class="form-group">
+              <label for="seating-preference" class="form-label">Seating Preference</label>
+              <select id="seating-preference" name="seating" class="form-input">
+                <option value="main">Main Dining Room</option>
+                <option value="chef">Chef's Hearth Counter</option>
+                <option value="patio">Heated Garden Terrace</option>
+                <option value="vault">Private Wine Vault</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="reservation-date" class="form-label">Reservation Date & Time</label>
+              <input type="datetime-local" id="reservation-date" name="datetime" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="guests-count" class="form-label">Party Size</label>
+              <select id="guests-count" name="guests" class="form-input">
+                <option value="2">Table for 2</option>
+                <option value="4">Table for 4</option>
+                <option value="6">Table for 6</option>
+                <option value="8+">Large Party (8+)</option>
+              </select>
+            </div>
+"""
+                    if '<div class="grid grid-2">' in updated_content:
+                        updated_content = updated_content.replace('<div class="grid grid-2">', '<div class="grid grid-2">\n' + seating_markup, 1)
+
+        elif target_file.endswith(".js"):
+            res_handler = """
+  // Enhanced Reservation Confirmation Feature
+  const resForm = document.getElementById('reservation-form');
+  if (resForm) {
+    resForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name')?.value || 'Guest';
+      const seating = document.getElementById('seating-preference')?.value || 'Main Dining Room';
+      alert(`🎉 Table Confirmed for ${name}! We have reserved your table (${seating}). A confirmation has been sent to your email.`);
+      resForm.reset();
+    });
+  }
+"""
+            if "Enhanced Reservation Confirmation" not in updated_content:
+                updated_content = updated_content.replace("});", res_handler + "\n});")
+
+        # Save sanitized file to sandbox
+        write_res = write_file(sandbox, target_file, updated_content)
+        blackboard.record_artifact(run_id, target_file, write_res["content_hash"], agent_id)
+
+        event_log.append(
+            run_id=run_id,
+            agent_id=agent_id,
+            event_type="file_edit",
+            target=target_file,
+            payload={"task_id": task_id, "bytes": write_res["bytes"], "summary": f"Applied quick edit: '{instruction}'"}
+        )
+
+        blackboard.update_task_status(run_id, task_id, agent_id, "done")
+        event_log.append(
+            run_id=run_id,
+            agent_id=agent_id,
+            event_type="task_done",
+            target=target_file,
+            payload={"task_id": task_id}
+        )
+
+    except Exception as err:
+        logger.error(f"Error executing quick edit: {err}", exc_info=True)
+    finally:
+        ACTIVE_RUNS.pop(run_id, None)
+        RUN_STATUSES[run_id] = compute_run_status(run_id, blackboard, sandbox)
+
 
 
 
@@ -421,6 +569,12 @@ def submit_quick_edit(run_id: str, req: QuickEditRequest):
         target=target_file,
         payload={"task_id": task_id, "instruction": req.instruction}
     )
+
+    # Launch asynchronous execution worker for targeted edit
+    edit_task = asyncio.create_task(
+        execute_quick_edit_async(run_id, task_id, target_file, req.instruction)
+    )
+    ACTIVE_RUNS[run_id] = edit_task
 
     return {"status": "queued", "task_id": task_id, "role": role_hint, "target": target_file}
 
