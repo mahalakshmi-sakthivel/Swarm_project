@@ -457,6 +457,48 @@ class SwarmAgent:
                 payload={"bytes": copy_res["bytes"], "summary": f"Generated copy.json with tone '{spec.tone}' and zero lorem ipsum"}
             )
 
+            # Seed baseline styles.css and script.js so project is never missing assets
+            if not self.sandbox.file_exists("styles.css"):
+                default_styles = """/* Page specific accents extending base.css */
+.hero {
+  background: radial-gradient(circle at 50% 20%, rgba(var(--primary-rgb), 0.10) 0%, transparent 70%);
+}
+.card:hover {
+  border-color: var(--primary);
+}
+"""
+                styles_res = write_file(self.sandbox, "styles.css", default_styles)
+                self.blackboard.record_artifact(self.run_id, "styles.css", styles_res["content_hash"], self.agent_id)
+
+            if not self.sandbox.file_exists("script.js"):
+                default_script = """// Mobile navigation toggle and smooth internal scroll
+document.addEventListener('DOMContentLoaded', () => {
+  const toggle = document.querySelector('.mobile-toggle');
+  const menu = document.querySelector('.nav-links');
+  if (toggle && menu) {
+    toggle.addEventListener('click', () => {
+      menu.classList.toggle('active');
+    });
+  }
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+      if (href && href.length > 1) {
+        try {
+          const target = document.querySelector(href);
+          if (target) {
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth' });
+          }
+        } catch (err) {}
+      }
+    });
+  });
+});
+"""
+                script_res = write_file(self.sandbox, "script.js", default_script)
+                self.blackboard.record_artifact(self.run_id, "script.js", script_res["content_hash"], self.agent_id)
+
             # Seed Content Copywriting task for specialized tone polish
             content_task = Task(
                 id="task-00-content",

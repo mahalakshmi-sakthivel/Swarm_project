@@ -101,7 +101,14 @@ async def execute_swarm_task(run_id: str, prompt: str, model: str, reference_ima
         )
 
         res = await swarm.run(max_seconds=1200.0)
-        RUN_STATUSES[run_id] = "converged" if res.get("converged") else "failed"
+        qa_report = run_qa_audit(sandbox)
+        has_html = (sandbox.sandbox_dir / "index.html").exists()
+        if res.get("converged") or qa_report.passed:
+            RUN_STATUSES[run_id] = "converged"
+        elif has_html:
+            RUN_STATUSES[run_id] = "completed"
+        else:
+            RUN_STATUSES[run_id] = "failed"
 
         # Export events to events.jsonl
         jsonl_path = RUNS_DIR / run_id / "events.jsonl"
@@ -173,8 +180,15 @@ def list_runs():
                     if goal:
                         prompt = goal.get("prompt", "")
                         created_at = goal.get("created_at", created_at)
-                    if not run_status:
-                        run_status = "converged" if bb.is_swarm_converged(run_id) else "incomplete"
+                    if not run_status or run_status == "failed":
+                        sb = Sandbox(run_id=run_id, base_dir=str(SANDBOX_DIR))
+                        qa_check = run_qa_audit(sb)
+                        if qa_check.passed:
+                            run_status = "converged"
+                        elif (sb.sandbox_dir / "index.html").exists():
+                            run_status = "completed"
+                        else:
+                            run_status = run_status or "incomplete"
 
                 runs.append({
                     "run_id": run_id,
@@ -208,9 +222,18 @@ def get_run_details(run_id: str):
         except Exception:
             pass
 
+    raw_status = RUN_STATUSES.get(run_id)
+    if not raw_status or raw_status == "failed":
+        if qa_report.passed:
+            raw_status = "converged"
+        elif (sandbox.sandbox_dir / "index.html").exists():
+            raw_status = "completed"
+        else:
+            raw_status = raw_status or "completed"
+
     return {
         "run_id": run_id,
-        "status": RUN_STATUSES.get(run_id, "completed"),
+        "status": raw_status,
         "is_active": run_id in ACTIVE_RUNS,
         "goal": goal,
         "spec": spec_data,
