@@ -94,6 +94,15 @@ export default function Header({
             >
               🔄
             </button>
+
+            <a
+              href={`/runs/${currentRunId}/export/zip`}
+              download
+              className="btn-download-zip"
+              title="Download Full Website as ZIP Archive"
+            >
+              📦 Download ZIP
+            </a>
           </>
         )}
       </div>

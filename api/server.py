@@ -10,6 +10,7 @@ Provides REST endpoints and Starlette WebSocket streaming for real-time swarm ob
 """
 
 import asyncio
+import io
 import json
 import logging
 import mimetypes
@@ -17,6 +18,7 @@ import os
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional
+import zipfile
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -199,11 +201,19 @@ def get_run_details(run_id: str):
     signals = blackboard.get_active_signals(run_id)
     qa_report = run_qa_audit(sandbox)
 
+    spec_data = None
+    if sandbox.file_exists("spec.json"):
+        try:
+            spec_data = json.loads(sandbox.read_file("spec.json"))
+        except Exception:
+            pass
+
     return {
         "run_id": run_id,
         "status": RUN_STATUSES.get(run_id, "completed"),
         "is_active": run_id in ACTIVE_RUNS,
         "goal": goal,
+        "spec": spec_data,
         "tasks": [t.model_dump() for t in tasks],
         "artifacts": [a.model_dump() for a in artifacts],
         "signals": [s.model_dump() for s in signals],
@@ -280,6 +290,166 @@ def preview_sandbox_file(run_id: str, path: str = ""):
         "Pragma": "no-cache",
     }
     return FileResponse(resolved_path, media_type=mime_type or "text/plain", headers=headers)
+
+
+class UpdateSpecRequest(BaseModel):
+    spec: Dict[str, Any]
+
+
+class QuickEditRequest(BaseModel):
+    instruction: str
+    target_file: Optional[str] = "styles.css"
+
+
+@app.get("/runs/{run_id}/spec")
+def get_run_spec(run_id: str):
+    """Retrieve the SiteSpec contract (spec.json) if available."""
+    sandbox = Sandbox(run_id=run_id, base_dir=str(SANDBOX_DIR))
+    if not sandbox.file_exists("spec.json"):
+        raise HTTPException(status_code=404, detail="spec.json not yet synthesized for this run")
+    try:
+        spec_content = sandbox.read_file("spec.json")
+        return json.loads(spec_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read spec.json: {e}")
+
+
+@app.put("/runs/{run_id}/spec")
+def update_run_spec(run_id: str, req: UpdateSpecRequest):
+    """
+    Update the SiteSpec contract and instantly regenerate base.css (:root variables and components)
+    with zero LLM call.
+    """
+    from runtime.spec import SiteSpec
+    from runtime.theme import generate_base_css
+
+    sandbox = Sandbox(run_id=run_id, base_dir=str(SANDBOX_DIR))
+    blackboard, event_log, _ = get_run_components(run_id)
+
+    try:
+        spec_obj = SiteSpec(**req.spec)
+        spec_json = spec_obj.model_dump_json(indent=2)
+        write_res = sandbox.write_file("spec.json", spec_json)
+        blackboard.record_artifact(run_id, "spec.json", write_res, "user-plan-review")
+
+        # Deterministically update base.css with zero LLM call
+        base_css_content = generate_base_css(spec_obj.theme)
+        base_res = sandbox.write_file("base.css", base_css_content)
+        blackboard.record_artifact(run_id, "base.css", base_res, "user-plan-review")
+
+        event_log.append(
+            run_id=run_id,
+            agent_id="user",
+            event_type="file_edit",
+            target="spec.json",
+            payload={"summary": "Updated SiteSpec theme and plan via Plan Review screen"}
+        )
+
+        return {"status": "success", "message": "SiteSpec and base.css updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid spec data: {e}")
+
+
+@app.post("/runs/{run_id}/quick-edit")
+def submit_quick_edit(run_id: str, req: QuickEditRequest):
+    """
+    Route a micro-instruction (e.g. 'make the hero darker') as a single targeted task to one file
+    without a full site rebuild.
+    """
+    from runtime.blackboard import Task
+
+    blackboard, event_log, sandbox = get_run_components(run_id)
+
+    target_file = req.target_file or "styles.css"
+    role_hint = "style" if target_file.endswith(".css") else "script" if target_file.endswith(".js") else "structure"
+
+    task_id = f"quick-edit-{target_file.replace('.', '-')}-{int(time.time() * 1000) % 10000}"
+    new_task = Task(
+        id=task_id,
+        run_id=run_id,
+        title=f"Quick Edit ({target_file}): {req.instruction[:50]}",
+        description=f"User requested targeted quick edit on {target_file}: '{req.instruction}'. Apply this edit concisely.",
+        role_hint=role_hint,
+        status="open",
+        priority=9,
+        target=target_file
+    )
+    blackboard.add_task(new_task)
+    blackboard.emit_signal(run_id, f"need_{role_hint}", target_file, "user", initial_strength=2.0)
+
+    event_log.append(
+        run_id=run_id,
+        agent_id="user",
+        event_type="quick_edit_submitted",
+        target=target_file,
+        payload={"task_id": task_id, "instruction": req.instruction}
+    )
+
+    return {"status": "queued", "task_id": task_id, "role": role_hint, "target": target_file}
+
+
+@app.get("/runs/{run_id}/export/zip")
+def export_sandbox_zip(run_id: str):
+    """Package the generated website files into a downloadable ZIP archive."""
+    sandbox = Sandbox(run_id=run_id, base_dir=str(SANDBOX_DIR))
+    files = sandbox.list_files()
+    if not files:
+        raise HTTPException(status_code=404, detail="No files found in sandbox to export")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for f in files:
+            if f.startswith("."):
+                continue
+            content = sandbox.read_file(f)
+            zip_file.writestr(f, content)
+
+    buf.seek(0)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{run_id}_website.zip"'
+    }
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers=headers
+    )
+
+
+@app.post("/runs/{run_id}/tasks/{task_id}/retry")
+def retry_task(run_id: str, task_id: str):
+    """Reset a task to 'open' state to allow swarm agents to re-execute it."""
+    blackboard, event_log, _ = get_run_components(run_id)
+    task = blackboard.get_task(run_id, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+
+    blackboard.update_task_status(run_id, task_id, None, "open")
+    if task.target:
+        blackboard.emit_signal(run_id, f"need_{task.role_hint}", task.target, "user-retry", initial_strength=1.5)
+
+    event_log.append(
+        run_id=run_id,
+        agent_id="user",
+        event_type="task_retried",
+        target=task.target or "",
+        payload={"task_id": task_id}
+    )
+
+    return {"status": "retried", "task_id": task_id}
+
+
+@app.get("/runs/{run_id}/versions")
+def get_run_versions(run_id: str):
+    """List artifact modification history and versions for the run."""
+    blackboard, event_log, sandbox = get_run_components(run_id)
+    artifacts = blackboard.list_artifacts(run_id)
+    events = event_log.get_events(run_id, since_id=0)
+    file_events = [e for e in events if e.event_type in ("file_edit", "fix_applied")]
+
+    return {
+        "artifacts": [a.model_dump() for a in artifacts],
+        "history": [e.model_dump() for e in file_events]
+    }
 
 
 @app.websocket("/ws/runs/{run_id}")

@@ -5,6 +5,13 @@ import AgentCards from './components/AgentCards';
 import TaskBoard from './components/TaskBoard';
 import PreviewPane from './components/PreviewPane';
 import EventFeed from './components/EventFeed';
+import PlanReviewCard from './components/PlanReviewCard';
+import RequirementsChecklist from './components/RequirementsChecklist';
+import AgentTimeline from './components/AgentTimeline';
+import QAScorecard from './components/QAScorecard';
+import QuickEditBar from './components/QuickEditBar';
+import TemplateGallery from './components/TemplateGallery';
+import VersionHistoryModal from './components/VersionHistoryModal';
 import {
   listRuns,
   getRunDetails,
@@ -23,8 +30,10 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
+  const [showVersionModal, setShowVersionModal] = useState(false);
   const [reloadTrigger, setReloadTrigger] = useState(0);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('preview'); // preview | plan | qa | requirements | timeline | templates
 
   const wsSubRef = useRef(null);
 
@@ -97,10 +106,8 @@ export default function App() {
   useEffect(() => {
     if (!currentRunId) return;
 
-    // Load initial snapshot
     fetchDetails(currentRunId);
 
-    // Clean up previous subscription
     if (wsSubRef.current) {
       wsSubRef.current.close();
       wsSubRef.current = null;
@@ -116,7 +123,6 @@ export default function App() {
             return [...prev, ev];
           });
 
-          // Sync agent states from history without reloading preview
           const agent = ev.agent || ev.agent_id;
           const eventType = ev.type || ev.event_type;
           if (agent) {
@@ -136,12 +142,10 @@ export default function App() {
         } else if (data.type === 'event' && data.data) {
           const ev = data.data;
           setEvents((prev) => {
-            // Avoid duplicate event ids
             if (prev.some((e) => e.id === ev.id)) return prev;
             return [...prev, ev];
           });
 
-          // Update agent states
           const agent = ev.agent || ev.agent_id;
           const eventType = ev.type || ev.event_type;
 
@@ -161,7 +165,6 @@ export default function App() {
             }));
           }
 
-          // Smoothly trigger reload only on live file edits (debounced by 300ms)
           if (eventType === 'file_edit' && runDetails?.status !== 'converged') {
             if (window._reloadTimer) clearTimeout(window._reloadTimer);
             window._reloadTimer = setTimeout(() => {
@@ -200,7 +203,7 @@ export default function App() {
     };
   }, [currentRunId, fetchDetails]);
 
-  // 4. Launch New Run Handler
+  // Launch New Run Handler
   const handleLaunchRun = async (prompt, model) => {
     setIsLaunching(true);
     try {
@@ -208,6 +211,7 @@ export default function App() {
       setShowPromptModal(false);
       await refreshRunsList(false);
       setCurrentRunId(newRun.run_id);
+      setActiveTab('preview');
     } catch (err) {
       alert(`Error launching swarm run: ${err.message}`);
     } finally {
@@ -227,6 +231,8 @@ export default function App() {
   const qaPassed = qaData ? qaData.passed : false;
   const files = runDetails?.files || [];
   const tasks = runDetails?.tasks || [];
+  const spec = runDetails?.spec || null;
+  const requirements = spec?.requirements || [];
 
   // Calculate Build Progress & Stage Status
   const totalTasks = tasks.length;
@@ -266,6 +272,11 @@ export default function App() {
               isLaunching={isLaunching}
               isModal={false}
             />
+            <div className="empty-gallery-section">
+              <TemplateGallery
+                onSelectTemplate={(prompt) => handleLaunchRun(prompt, 'qwen3.5:4b')}
+              />
+            </div>
           </div>
         )}
 
@@ -300,6 +311,12 @@ export default function App() {
                     ⏱️ Est. build time: 1.5 - 2.5 min (~30s / task)
                   </span>
                 )}
+                <button
+                  className="btn-version-history"
+                  onClick={() => setShowVersionModal(true)}
+                >
+                  📜 Versions
+                </button>
               </div>
             </div>
             <div className="progress-track">
@@ -311,34 +328,142 @@ export default function App() {
           </div>
         )}
 
-        {/* Workspace Split Layout */}
-        <div className={`workspace-grid ${isFocusMode ? 'focus-mode-grid' : ''}`}>
-          {/* Left Column: Live Preview & Cursors */}
-          <section className="preview-section">
-            <div className="section-title-bar">
-              <h3>🌐 Live Sandbox Preview</h3>
-              <span className="section-badge">Hot-Reload Active</span>
-            </div>
-            <PreviewPane
+        {/* Phase 7 Dashboard Workspace Tabs */}
+        {currentRunId && (
+          <nav className="dashboard-tab-bar" aria-label="Dashboard views">
+            <button
+              className={`dashboard-tab ${activeTab === 'preview' ? 'active' : ''}`}
+              onClick={() => setActiveTab('preview')}
+            >
+              🌐 Live Preview
+            </button>
+            <button
+              className={`dashboard-tab ${activeTab === 'plan' ? 'active' : ''}`}
+              onClick={() => setActiveTab('plan')}
+            >
+              📋 Plan Review & Theme
+            </button>
+            <button
+              className={`dashboard-tab ${activeTab === 'qa' ? 'active' : ''}`}
+              onClick={() => setActiveTab('qa')}
+            >
+              🛡️ QA Scorecard {qaScore !== null ? `(${qaScore.toFixed(0)}/100)` : ''}
+            </button>
+            <button
+              className={`dashboard-tab ${activeTab === 'requirements' ? 'active' : ''}`}
+              onClick={() => setActiveTab('requirements')}
+            >
+              ✅ Requirements ({requirements.length})
+            </button>
+            <button
+              className={`dashboard-tab ${activeTab === 'timeline' ? 'active' : ''}`}
+              onClick={() => setActiveTab('timeline')}
+            >
+              ⏱️ Agent Timeline ({tasks.length})
+            </button>
+            <button
+              className={`dashboard-tab ${activeTab === 'templates' ? 'active' : ''}`}
+              onClick={() => setActiveTab('templates')}
+            >
+              🎨 Template Gallery
+            </button>
+          </nav>
+        )}
+
+        {/* Tab 1: Live Preview & Quick Edit */}
+        {activeTab === 'preview' && currentRunId && (
+          <div className={`workspace-grid ${isFocusMode ? 'focus-mode-grid' : ''}`}>
+            {/* Left Column: Live Preview & Quick Edit */}
+            <section className="preview-section">
+              <div className="section-title-bar">
+                <h3>🌐 Live Sandbox Preview</h3>
+                <span className="section-badge">Hot-Reload Active</span>
+              </div>
+              <PreviewPane
+                runId={currentRunId}
+                files={files}
+                tasks={tasks}
+                activeEvents={events}
+                reloadTrigger={reloadTrigger}
+                runStatus={runDetails?.status}
+                isFocusMode={isFocusMode}
+                onToggleFocusMode={setIsFocusMode}
+              />
+              {/* Quick Edit Bar */}
+              <QuickEditBar
+                runId={currentRunId}
+                onEditSubmitted={() => {
+                  fetchDetails(currentRunId);
+                  setReloadTrigger((v) => v + 1);
+                }}
+              />
+            </section>
+
+            {/* Right Column: Agents & Blackboard Tasks (Hidden in Focus Mode) */}
+            {!isFocusMode && (
+              <section className="sidebar-section">
+                <AgentCards agents={agents} activeTasks={tasks} />
+                <TaskBoard tasks={tasks} />
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Plan Review Card */}
+        {activeTab === 'plan' && currentRunId && (
+          <section className="tab-content-section">
+            <PlanReviewCard
               runId={currentRunId}
-              files={files}
-              tasks={tasks}
-              activeEvents={events}
-              reloadTrigger={reloadTrigger}
-              runStatus={runDetails?.status}
-              isFocusMode={isFocusMode}
-              onToggleFocusMode={setIsFocusMode}
+              onApproved={() => {
+                setActiveTab('preview');
+                handleRefreshPreview();
+              }}
+              onPlanUpdated={() => {
+                setReloadTrigger((v) => v + 1);
+                fetchDetails(currentRunId);
+              }}
             />
           </section>
+        )}
 
-          {/* Right Column: Agents & Blackboard Tasks (Hidden in Focus Mode) */}
-          {!isFocusMode && (
-            <section className="sidebar-section">
-              <AgentCards agents={agents} activeTasks={tasks} />
-              <TaskBoard tasks={tasks} />
-            </section>
-          )}
-        </div>
+        {/* Tab 3: QA Scorecard */}
+        {activeTab === 'qa' && currentRunId && (
+          <section className="tab-content-section">
+            <QAScorecard qaData={qaData} runStatus={runDetails?.status} />
+          </section>
+        )}
+
+        {/* Tab 4: Requirements Checklist */}
+        {activeTab === 'requirements' && currentRunId && (
+          <section className="tab-content-section">
+            <RequirementsChecklist
+              requirements={requirements}
+              qaReport={qaData}
+            />
+          </section>
+        )}
+
+        {/* Tab 5: Agent Timeline */}
+        {activeTab === 'timeline' && currentRunId && (
+          <section className="tab-content-section">
+            <AgentTimeline
+              runId={currentRunId}
+              tasks={tasks}
+              onTaskRetried={() => {
+                fetchDetails(currentRunId);
+              }}
+            />
+          </section>
+        )}
+
+        {/* Tab 6: Template Gallery */}
+        {activeTab === 'templates' && (
+          <section className="tab-content-section">
+            <TemplateGallery
+              onSelectTemplate={(prompt) => handleLaunchRun(prompt, 'qwen3.5:4b')}
+            />
+          </section>
+        )}
 
         {/* Bottom Full-Width Log Stream */}
         <section className="log-section">
@@ -356,8 +481,21 @@ export default function App() {
               onClose={() => setShowPromptModal(false)}
               isModal={true}
             />
+            <div className="modal-gallery-row">
+              <TemplateGallery
+                onSelectTemplate={(prompt) => handleLaunchRun(prompt, 'qwen3.5:4b')}
+              />
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Version History Modal */}
+      {showVersionModal && currentRunId && (
+        <VersionHistoryModal
+          runId={currentRunId}
+          onClose={() => setShowVersionModal(false)}
+        />
       )}
     </div>
   );

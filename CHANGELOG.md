@@ -2,6 +2,46 @@
 
 All notable changes to the Swarm Website Builder project will be documented in this file.
 
+## [Phase 7: Dashboard UI/UX Upgrades] - 2026-11-11
+### Added
+- **Plan Review Screen (`ui/src/components/PlanReviewCard.jsx`)**:
+  - Displays synthesized `SiteSpec` contract as an editable architecture card after `task-00-plan`.
+  - Shows page hierarchy, navigation order, features list, and requirement pills.
+  - Interactive color swatch inputs (`primary`, `secondary`, `accent`, `bg`, `text`) and font pickers (`font_heading`, `font_body`).
+  - Live instant `:root` and `base.css` regeneration with zero LLM call via `PUT /runs/{run_id}/spec`.
+  - "Approve & Build" button unblocking downstream agents.
+- **Requirements Checklist Panel (`ui/src/components/RequirementsChecklist.jsx`)**:
+  - Real-time checklist of user requirements (R1, R2, ...) mapped against QA audit results.
+  - Live green/red status indicators with coverage percentage (`X% Verified (Y/Z)`).
+- **Agent Timeline & Task Inspector (`ui/src/components/AgentTimeline.jsx`)**:
+  - Execution timeline tracking task states: Queued (`open`), Running (`in_progress`), Done (`completed`), and Failed (`failed`).
+  - Interactive modal dialog to inspect task descriptions, dependency graphs, and agent reasoning.
+  - "Retry this task" button calling `POST /runs/{run_id}/tasks/{task_id}/retry` to re-enqueue tasks.
+- **Deterministic QA Scorecard (`ui/src/components/QAScorecard.jsx`)**:
+  - Visual circle gauge for overall score (0–100) and convergence status.
+  - 6 core verification check cards (Links integrity, Theme variables, Requirements coverage, Responsive design, Accessibility, JavaScript DOM integrity).
+  - Detailed actionable defects table with file, line number, rule, and remediation hints.
+- **Quick Edit Box (`ui/src/components/QuickEditBar.jsx`)**:
+  - Integrated micro-instruction bar allowing single-file targeted tweaks (e.g. "make the hero darker") without triggering a full rebuild.
+  - Routes directly to the responsible specialist agent via `POST /runs/{run_id}/quick-edit`.
+- **Starter Template Gallery (`ui/src/components/TemplateGallery.jsx`)**:
+  - Home screen and modal gallery featuring 5 production starter domains: Restaurant, SaaS, Portfolio, Store, and Blog.
+  - One-click template adoption with pre-configured prompts and multi-page layouts.
+- **Artifact Version History & Download ZIP (`ui/src/components/VersionHistoryModal.jsx`)**:
+  - Downloadable full-site ZIP bundle via `GET /runs/{run_id}/export/zip` with native `zipfile` packaging.
+  - Audit modal displaying recorded artifact versions, sha256 hashes, and modification history.
+- **Backend Dashboard Endpoints in `api/server.py`**:
+  - `GET /runs/{run_id}/spec` & `PUT /runs/{run_id}/spec`
+  - `POST /runs/{run_id}/quick-edit`
+  - `GET /runs/{run_id}/export/zip`
+  - `POST /runs/{run_id}/tasks/{task_id}/retry`
+  - `GET /runs/{run_id}/versions`
+  - Embedded `spec` payload in `GET /runs/{run_id}`
+- **Automated Test Suite (`tests/test_phase7.py`)**:
+  - 5 comprehensive tests verifying spec retrieval, instant `:root` regeneration without LLM call, targeted quick edit task creation, ZIP archive integrity, task retry status reset, and version history.
+
+---
+
 ## [Phase 6: Smaller Reliable LLM Calls, Content Agent, Model Config & HTML Healer] - 2026-11-10
 ### Added
 - `runtime/healer.py`:

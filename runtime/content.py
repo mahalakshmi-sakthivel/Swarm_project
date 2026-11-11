@@ -191,3 +191,4 @@ def generate_default_copy(spec: SiteSpec) -> SiteCopy:
         tone=spec.tone or "professional",
         pages=page_copies
     )
+

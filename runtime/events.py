@@ -22,7 +22,9 @@ VALID_EVENT_TYPES = {
     "fix_applied",
     "agent_failed",
     "agent_recovered",
-    "task_done"
+    "task_done",
+    "quick_edit_submitted",
+    "task_retried"
 }
 
 

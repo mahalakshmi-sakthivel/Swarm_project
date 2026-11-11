@@ -89,3 +89,53 @@ export function subscribeToRun(runId, onMessage, onError, onOpen, onClose) {
   };
 }
 
+export async function getRunSpec(runId) {
+  const res = await fetch(`${API_BASE}/runs/${runId}/spec`);
+  if (!res.ok) throw new Error(`Failed to fetch spec: ${res.statusText}`);
+  return res.json();
+}
+
+export async function updateRunSpec(runId, spec) {
+  const res = await fetch(`${API_BASE}/runs/${runId}/spec`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ spec }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to update spec: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function submitQuickEdit(runId, instruction, targetFile = 'styles.css') {
+  const res = await fetch(`${API_BASE}/runs/${runId}/quick-edit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instruction, target_file: targetFile }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to submit quick edit: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function retryTask(runId, taskId) {
+  const res = await fetch(`${API_BASE}/runs/${runId}/tasks/${taskId}/retry`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(`Failed to retry task: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getRunVersions(runId) {
+  const res = await fetch(`${API_BASE}/runs/${runId}/versions`);
+  if (!res.ok) throw new Error(`Failed to fetch versions: ${res.statusText}`);
+  return res.json();
+}
+
+export function getZipExportUrl(runId) {
+  return `${API_BASE}/runs/${runId}/export/zip`;
+}
+
