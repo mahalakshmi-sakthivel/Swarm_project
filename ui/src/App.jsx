@@ -34,6 +34,8 @@ export default function App() {
   const [reloadTrigger, setReloadTrigger] = useState(0);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [activeTab, setActiveTab] = useState('preview'); // preview | plan | qa | requirements | timeline | templates
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [isPromptExpanded, setIsPromptExpanded] = useState(true);
 
   const wsSubRef = useRef(null);
 
@@ -254,7 +256,18 @@ export default function App() {
         runs={runs}
         currentRunId={currentRunId}
         onSelectRun={(id) => setCurrentRunId(id)}
-        onNewRunClick={() => setShowPromptModal(true)}
+        onNewRunClick={() => {
+          setIsPromptExpanded(true);
+          setTimeout(() => {
+            const el = document.getElementById('goal-prompt');
+            if (el) {
+              el.focus();
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+              setShowPromptModal(true);
+            }
+          }, 80);
+        }}
         runStatus={runDetails?.status}
         qaScore={qaScore}
         qaPassed={qaPassed}
@@ -264,21 +277,39 @@ export default function App() {
 
       {/* Main App Workspace */}
       <main className="swarm-workspace">
-        {/* Top Prompt Banner (shown if no runs exist) */}
-        {runs.length === 0 && (
-          <div className="empty-runs-banner">
-            <PromptBar
-              onLaunchRun={handleLaunchRun}
-              isLaunching={isLaunching}
-              isModal={false}
-            />
-            <div className="empty-gallery-section">
-              <TemplateGallery
-                onSelectTemplate={(prompt) => handleLaunchRun(prompt, 'qwen3.5:4b')}
+        {/* Always-Accessible Custom Prompt Builder Bar */}
+        <section className="top-prompt-creator-section">
+          {isPromptExpanded ? (
+            <div className="prompt-wrapper">
+              <div className="prompt-toggle-bar">
+                <span className="prompt-section-label">✨ Create New Website</span>
+                {currentRunId && (
+                  <button
+                    type="button"
+                    className="btn-toggle-prompt"
+                    onClick={() => setIsPromptExpanded(false)}
+                    title="Minimize prompt box to view preview"
+                  >
+                    ▲ Collapse
+                  </button>
+                )}
+              </div>
+              <PromptBar
+                onLaunchRun={handleLaunchRun}
+                isLaunching={isLaunching}
+                initialPrompt={customPrompt}
+                isModal={false}
               />
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="prompt-collapsed-bar" onClick={() => setIsPromptExpanded(true)}>
+              <span className="collapsed-text">🚀 <strong>Start New Website Build:</strong> Type a prompt to generate a new website...</span>
+              <button type="button" className="btn-expand-prompt">
+                ▼ Open Prompt Box
+              </button>
+            </div>
+          )}
+        </section>
 
         {/* Real-Time Build Progress & Completion Status */}
         {currentRunId && (
@@ -461,6 +492,15 @@ export default function App() {
           <section className="tab-content-section">
             <TemplateGallery
               onSelectTemplate={(prompt) => handleLaunchRun(prompt, 'qwen3.5:4b')}
+              onCustomizeTemplate={(prompt) => {
+                setCustomPrompt(prompt);
+                setIsPromptExpanded(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(() => {
+                  const el = document.getElementById('goal-prompt');
+                  if (el) el.focus();
+                }, 100);
+              }}
             />
           </section>
         )}
@@ -480,10 +520,14 @@ export default function App() {
               isLaunching={isLaunching}
               onClose={() => setShowPromptModal(false)}
               isModal={true}
+              initialPrompt={customPrompt}
             />
             <div className="modal-gallery-row">
               <TemplateGallery
                 onSelectTemplate={(prompt) => handleLaunchRun(prompt, 'qwen3.5:4b')}
+                onCustomizeTemplate={(prompt) => {
+                  setCustomPrompt(prompt);
+                }}
               />
             </div>
           </div>

@@ -423,7 +423,7 @@ class SwarmAgent:
             # Generate and record deterministic base.css component library (Phase 3)
             from runtime.theme import generate_base_css
             base_css_content = generate_base_css(spec.theme)
-            base_res = self.sandbox.write_file("base.css", base_css_content)
+            base_res = write_file(self.sandbox, "base.css", base_css_content)
             self.blackboard.record_artifact(
                 run_id=self.run_id,
                 path="base.css",
@@ -442,7 +442,7 @@ class SwarmAgent:
             from runtime.content import generate_default_copy
             site_copy = generate_default_copy(spec)
             copy_json_str = site_copy.model_dump_json(indent=2)
-            copy_res = self.sandbox.write_file("copy.json", copy_json_str)
+            copy_res = write_file(self.sandbox, "copy.json", copy_json_str)
             self.blackboard.record_artifact(
                 run_id=self.run_id,
                 path="copy.json",
@@ -543,7 +543,7 @@ class SwarmAgent:
                 spec_obj = SiteSpec(**spec_raw)
                 default_copy = generate_default_copy(spec_obj)
                 copy_str = default_copy.model_dump_json(indent=2)
-                write_res = self.sandbox.write_file("copy.json", copy_str)
+                write_res = write_file(self.sandbox, "copy.json", copy_str)
                 self.blackboard.record_artifact(self.run_id, "copy.json", write_res["content_hash"], self.agent_id)
                 self.event_log.append(
                     run_id=self.run_id,

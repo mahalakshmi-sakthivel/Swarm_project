@@ -43,12 +43,12 @@ const TEMPLATES = [
   },
 ];
 
-export default function TemplateGallery({ onSelectTemplate }) {
+export default function TemplateGallery({ onSelectTemplate, onCustomizeTemplate }) {
   return (
     <div className="template-gallery-container">
       <div className="gallery-header">
         <h3>🎨 Starter Template Gallery</h3>
-        <p>Select a hand-crafted architecture template or launch directly with a tailored prompt.</p>
+        <p>Select a hand-crafted architecture template to generate immediately or customize the prompt first.</p>
       </div>
 
       <div className="templates-cards-grid">
@@ -65,12 +65,25 @@ export default function TemplateGallery({ onSelectTemplate }) {
                 <span key={p} className="page-tag">{p}</span>
               ))}
             </div>
-            <button
-              className="btn-use-template"
-              onClick={() => onSelectTemplate(tmpl.prompt)}
-            >
-              Use This Template →
-            </button>
+            <div className="template-actions-row">
+              <button
+                className="btn-use-template"
+                onClick={() => onSelectTemplate(tmpl.prompt)}
+                title="Immediately build this template"
+              >
+                ⚡ Generate
+              </button>
+              {onCustomizeTemplate && (
+                <button
+                  type="button"
+                  className="btn-customize-template"
+                  onClick={() => onCustomizeTemplate(tmpl.prompt)}
+                  title="Load prompt into editor to tweak"
+                >
+                  ✏️ Edit Prompt
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
